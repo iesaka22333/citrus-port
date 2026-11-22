@@ -1,0 +1,939 @@
+import { MaterialTheme } from "material-theme.slint";
+import { ScrollView } from "std-widgets.slint";
+import "./MaterialSymbolsRounded-VariableFont_FILL,GRAD,opsz,wght.ttf";
+
+import {
+    MaterialCard,
+    MaterialFilledButton,
+    MaterialTonalButton,
+    MaterialOutlinedButton,
+    MaterialNavigationItem,
+    MaterialSelect,
+    SectionTitle,
+    FieldLabel,
+    MaterialCheckbox,
+    MaterialTextField,
+    MaterialTextArea,
+    MaterialReceiveView
+} from "material-widgets.slint";
+
+
+export component MainWindow inherits Window {
+    title: "CitrusPort";
+
+    preferred-width: 1100px;
+    preferred-height: 720px;
+    min-width: 900px;
+    min-height: 600px;
+
+    background: MaterialTheme.background;
+
+
+    // ========================================================================
+    // State
+    // ========================================================================
+
+    in-out property <int> active_tab: 0;
+    in-out property <bool> is_connected: false;
+    in-out property <bool> is_connecting: false;
+
+    in property <[string]> available_ports: [];
+    in-out property <string> current_port: "";
+    in-out property <string> current_baud_rate: "115200";
+    in-out property <string> current_encoding: "UTF-8";
+    in-out property <string> current_data_bits: "8";
+    in-out property <string> current_parity: "None";
+    in-out property <string> current_stop_bits: "1";
+    in-out property <string> current_flow_control: "None";
+
+    in-out property <string> rx_content: "CitrusPort等待打开串口...";
+    in-out property <string> tx_content: "";
+
+    in-out property <bool> cts_enabled: false;
+    in-out property <bool> rts_enabled: false;
+    in-out property <bool> break_enabled: false;
+
+    in-out property <bool> hex_display: false;
+    in-out property <bool> show_timestamp: true;
+    in-out property <bool> auto_scroll: true;
+    in-out property <bool> hex_send: false;
+
+    in-out property <string> current_newline: "\\r\\n";
+
+
+    // ========================================================================
+    // Callbacks
+    // ========================================================================
+
+    callback toggle_port_clicked();
+    callback send_clicked();
+    callback clear_rx_clicked();
+    callback save_rx_clicked();
+
+
+    // ========================================================================
+    // Main Layout
+    // ========================================================================
+
+    HorizontalLayout {
+        padding: 12px;
+        spacing: 12px;
+
+
+        // ====================================================================
+        // Navigation Rail
+        // ====================================================================
+
+        Rectangle {
+            width: 80px;
+
+            background: MaterialTheme.surface_container;
+            border-radius: 20px;
+
+
+            VerticalLayout {
+                padding-top: 20px;
+                padding-bottom: 20px;
+                spacing: 8px;
+
+
+                // ============================================================
+                // Logo
+                // ============================================================
+
+                Rectangle {
+                    width: 80px;
+                    height: 72px;
+
+
+                    Rectangle {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+
+                        width: 48px;
+                        height: 48px;
+
+                        border-radius: 16px;
+                        background: MaterialTheme.primary_container;
+
+
+                        Text {
+                            width: parent.width;
+                            height: parent.height;
+
+                            text: "CP";
+
+                            color: MaterialTheme.on_primary_container;
+                            font-size: 17px;
+                            font-weight: 800;
+
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+
+                // ============================================================
+                // Navigation
+                // ============================================================
+
+                VerticalLayout {
+                    width: 80px;
+                    spacing: 4px;
+
+
+                    MaterialNavigationItem {
+                        width: 80px;
+                        height: 64px;
+
+                        icon: "usb";
+                        label: "串口";
+
+                        selected: root.active_tab == 0;
+
+                        clicked => {
+                            root.active_tab = 0;
+                        }
+                    }
+
+
+                    MaterialNavigationItem {
+                        width: 80px;
+                        height: 64px;
+
+                        icon: "monitoring";
+                        label: "波形";
+
+                        selected: root.active_tab == 1;
+
+                        clicked => {
+                            root.active_tab = 1;
+                        }
+                    }
+
+
+                    MaterialNavigationItem {
+                        width: 80px;
+                        height: 64px;
+
+                        icon: "swap_horiz";
+                        label: "协议";
+
+                        selected: root.active_tab == 2;
+
+                        clicked => {
+                            root.active_tab = 2;
+                        }
+                    }
+                }
+
+
+                // ============================================================
+                // Bottom Spacer
+                // ============================================================
+
+                Rectangle {
+                    vertical-stretch: 1;
+                }
+            }
+        }
+
+
+        // ====================================================================
+        // Main Area
+        // ====================================================================
+
+        if root.active_tab == 0 : VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 16px;
+
+
+            // =================================================================
+            // Top App Bar
+            // =================================================================
+
+            Rectangle {
+                height: 56px;
+                background: Colors.transparent;
+
+
+                HorizontalLayout {
+                    spacing: 12px;
+
+
+                    // ---------------------------------------------------------
+                    // Page Title
+                    // ---------------------------------------------------------
+
+                    VerticalLayout {
+                        spacing: 0px;
+
+
+                        Text {
+                            text: "CitrusPort";
+
+                            height: 28px;
+
+                            color: MaterialTheme.text_primary;
+                            font-size: 24px;
+                            font-weight: 600;
+
+                            vertical-alignment: center;
+                        }
+
+
+                        Text {
+                            text: root.is_connecting
+                                ? "正在打开串口…"
+                                : root.is_connected
+                                    ? "串口已连接"
+                                    : "未连接设备";
+
+                            height: 20px;
+
+                            color: root.is_connecting
+                                ? MaterialTheme.primary
+                                : root.is_connected
+                                    ? MaterialTheme.primary
+                                    : MaterialTheme.text_secondary;
+
+                            font-size: 12px;
+
+                            vertical-alignment: center;
+                        }
+                    }
+
+
+                    // ---------------------------------------------------------
+                    // Spacer
+                    // ---------------------------------------------------------
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                    }
+
+
+                    // ---------------------------------------------------------
+                    // Connection Indicator
+                    // ---------------------------------------------------------
+
+                    VerticalLayout {
+                        alignment: center;
+
+
+                        Rectangle {
+                            width: 10px;
+                            height: 10px;
+
+                            border-radius: 5px;
+
+                            background: root.is_connecting
+                                ? MaterialTheme.primary_container
+                                : root.is_connected
+                                    ? MaterialTheme.primary
+                                    : MaterialTheme.outline;
+                        }
+                    }
+
+
+                    Text {
+                        text: root.is_connecting
+                            ? "Connecting"
+                            : root.is_connected
+                                ? "Connected"
+                                : "Disconnected";
+
+                        color: MaterialTheme.text_secondary;
+                        font-size: 12px;
+
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+
+            // =================================================================
+            // Main Workspace
+            // =================================================================
+
+            HorizontalLayout {
+                vertical-stretch: 1;
+                spacing: 16px;
+
+
+                // =============================================================
+                // Serial Settings
+                // =============================================================
+
+                MaterialCard {
+                    width: 260px;
+
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 0px;
+
+
+                        // -----------------------------------------------------
+                        // Title
+                        // -----------------------------------------------------
+
+                        SectionTitle {
+                            text: "串口设置";
+                            height: 28px;
+                        }
+
+
+                        // -----------------------------------------------------
+                        // Scrollable Parameters
+                        // -----------------------------------------------------
+
+                        ScrollView {
+                            vertical-stretch: 1;
+
+                            vertical-scrollbar-policy: always-off;
+                            horizontal-scrollbar-policy: always-off;
+
+
+                            VerticalLayout {
+                                padding-top: 12px;
+                                padding-bottom: 12px;
+                                spacing: 16px;
+
+
+                                // =================================================
+                                // Baud Rate
+                                // =================================================
+
+                                VerticalLayout {
+                                    spacing: 6px;
+
+                                    FieldLabel {
+                                         text: "端口" ; 
+                                   } 
+                                    MaterialSelect { 
+                                        width: 100%; 
+                                        horizontal-stretch: 1; 
+                                        options: root.available_ports; 
+                                        value <=> root.current_port; 
+                                        placeholder: "选择端口"; 
+                                    }
+
+
+                                    FieldLabel {
+                                        text: "波特率";
+                                    }
+
+
+                                    MaterialSelect {
+                                        width: 100%;
+
+                                        value <=> root.current_baud_rate;
+
+                                        options: [
+                                            "9600",
+                                            "19200",
+                                            "38400",
+                                            "57600",
+                                            "115200",
+                                            "230400",
+                                            "460800",
+                                            "921600",
+                                            "1000000",
+                                            "1500000",
+                                            "2000000",
+                                            "3000000"
+                                        ];
+
+                                        placeholder: "选择波特率";
+                                    }
+                                }
+
+
+                                // =================================================
+                                // Data Bits
+                                // =================================================
+
+                                VerticalLayout {
+                                    spacing: 6px;
+
+
+                                    FieldLabel {
+                                        text: "数据位";
+                                    }
+
+
+                                    MaterialSelect {
+                                        width: 100%;
+
+                                        value <=> root.current_data_bits;
+
+                                        options: [
+                                            "8",
+                                            "7",
+                                            "6",
+                                            "5"
+                                        ];
+
+                                        placeholder: "选择数据位";
+                                    }
+                                }
+
+
+                                // =================================================
+                                // Parity
+                                // =================================================
+
+                                VerticalLayout {
+                                    spacing: 6px;
+
+
+                                    FieldLabel {
+                                        text: "校验位";
+                                    }
+
+
+                                    MaterialSelect {
+                                        width: 100%;
+
+                                        value <=> root.current_parity;
+
+                                        options: [
+                                            "None",
+                                            "Even",
+                                            "Odd",
+                                            "Mark",
+                                            "Space"
+                                        ];
+
+                                        placeholder: "选择校验位";
+                                    }
+                                }
+
+
+                                // =================================================
+                                // Stop Bits
+                                // =================================================
+
+                                VerticalLayout {
+                                    spacing: 6px;
+
+
+                                    FieldLabel {
+                                        text: "停止位";
+                                    }
+
+
+                                    MaterialSelect {
+                                        width: 100%;
+
+                                        value <=> root.current_stop_bits;
+
+                                        options: [
+                                            "1",
+                                            "1.5",
+                                            "2"
+                                        ];
+
+                                        placeholder: "选择停止位";
+                                    }
+                                }
+
+
+                                // =================================================
+                                // Flow Control
+                                // =================================================
+
+                                VerticalLayout {
+                                    spacing: 6px;
+
+
+                                    FieldLabel {
+                                        text: "数据流控";
+                                    }
+
+
+                                    MaterialSelect {
+                                        width: 100%;
+
+                                        value <=> root.current_flow_control;
+
+                                        options: [
+                                            "None",
+                                            "Software (XON/XOFF)",
+                                            "Hardware (RTS/CTS)"
+                                        ];
+
+                                        placeholder: "选择流控";
+                                    }
+                                }
+
+
+                                // =================================================
+                                // Flow Control Signals
+                                // =================================================
+
+                                VerticalLayout {
+                                    spacing: 8px;
+
+
+                                    FieldLabel {
+                                        text: "流控信号";
+                                    }
+
+
+                                    HorizontalLayout {
+                                        spacing: 8px;
+
+
+                                        MaterialCheckbox {
+                                            text: "CTS";
+                                            checked <=> root.cts_enabled;
+                                        }
+
+
+                                        MaterialCheckbox {
+                                            text: "RTS";
+                                            checked <=> root.rts_enabled;
+                                        }
+
+
+                                        MaterialCheckbox {
+                                            text: "Break";
+                                            checked <=> root.break_enabled;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+
+                        // -----------------------------------------------------
+                        // Divider
+                        // -----------------------------------------------------
+
+                        Rectangle {
+                            width: 100%;
+                            height: 1px;
+
+                            background: MaterialTheme.outline_variant;
+                        }
+
+
+                        // -----------------------------------------------------
+                        // Bottom Action
+                        // -----------------------------------------------------
+
+                        Rectangle {
+                            width: 100%;
+                            height: 68px;
+
+
+                            MaterialFilledButton {
+                                x: 0px;
+                                y: 12px;
+
+                                width: parent.width;
+                                height: 48px;
+
+                                text: root.is_connecting
+                                    ? "正在打开…"
+                                    : root.is_connected
+                                        ? "关闭串口"
+                                        : "打开串口";
+
+                                enabled: !root.is_connecting;
+
+                                clicked => {
+                                    root.toggle_port_clicked();
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+                // =============================================================
+                // Receive
+                // =============================================================
+
+                MaterialCard {
+                    horizontal-stretch: 1;
+                    vertical-stretch: 1;
+
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 12px;
+
+
+                        SectionTitle {
+                            text: "接收数据";
+                        }
+
+
+                        // -----------------------------------------------------
+                        // Receive Toolbar
+                        // -----------------------------------------------------
+
+                        HorizontalLayout {
+                            height: 32px;
+                            spacing: 8px;
+
+
+                            MaterialCheckbox {
+                                text: "HEX显示";
+                                checked <=> root.hex_display;
+                            }
+
+
+                            MaterialCheckbox {
+                                text: "时间戳";
+                                checked <=> root.show_timestamp;
+                            }
+
+
+                            MaterialCheckbox {
+                                text: "自动滚屏";
+                                checked <=> root.auto_scroll;
+                            }
+
+
+                            Rectangle {
+                                width: 1px;
+                                height: 18px;
+
+                                y: (parent.height - self.height) / 2;
+
+                                background: MaterialTheme.outline_variant;
+                            }
+
+
+                            FieldLabel {
+                                text: "编码:";
+                                height: 32px;
+                            }
+
+
+                            MaterialSelect {
+                                width: 100px;
+                                height: 32px;
+
+                                value <=> root.current_encoding;
+
+                                options: [
+                                    "UTF-8",
+                                    "GBK",
+                                    "ASCII"
+                                ];
+
+                                placeholder: "编码";
+                            }
+
+
+                            Rectangle {
+                                horizontal-stretch: 1;
+                            }
+
+
+                            Text {
+                                text: root.rx_content == ""
+                                    ? "0 bytes"
+                                    : "接收中";
+
+                                color: MaterialTheme.text_secondary;
+                                font-size: 12px;
+
+                                vertical-alignment: center;
+                            }
+                        }
+
+
+                        // -----------------------------------------------------
+                        // Receive Text Area
+                        // -----------------------------------------------------
+
+                        MaterialReceiveView {
+                            horizontal-stretch: 1;
+                            vertical-stretch: 1;
+
+                            text: root.rx_content;
+                            auto_scroll: root.auto_scroll;
+                        }
+                    }
+                }
+            }
+
+
+            // =================================================================
+            // Bottom Workspace
+            // =================================================================
+
+            HorizontalLayout {
+                height: 176px;
+                spacing: 16px;
+
+
+                // =============================================================
+                // Operations
+                // =============================================================
+
+                MaterialCard {
+                    width: 260px;
+
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 12px;
+
+
+                        SectionTitle {
+                            text: "操作";
+                        }
+
+
+                        MaterialTonalButton {
+                            width: 100%;
+
+                            text: "清空接收区";
+
+                            clicked => {
+                                root.clear_rx_clicked();
+                            }
+                        }
+
+
+                        MaterialOutlinedButton {
+                            width: 100%;
+
+                            text: "保存接收区";
+
+                            clicked => {
+                                root.save_rx_clicked();
+                            }
+                        }
+                    }
+                }
+
+
+                // =============================================================
+                // Transmit
+                // =============================================================
+
+                MaterialCard {
+                    horizontal-stretch: 1;
+
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 12px;
+
+
+                        SectionTitle {
+                            text: "数据发送";
+                        }
+
+
+                        // -----------------------------------------------------
+                        // Send Toolbar
+                        // -----------------------------------------------------
+
+                        HorizontalLayout {
+                            height: 32px;
+                            spacing: 12px;
+
+
+                            MaterialCheckbox {
+                                text: "HEX发送";
+                                checked <=> root.hex_send;
+                            }
+
+
+                            Rectangle {
+                                width: 1px;
+                                height: 18px;
+
+                                y: (parent.height - self.height) / 2;
+
+                                background: MaterialTheme.outline_variant;
+                            }
+
+
+                            Rectangle {
+                                horizontal-stretch: 1;
+                            }
+
+
+                            Text {
+                                text: "换行";
+
+                                color: MaterialTheme.text_secondary;
+                                font-size: 12px;
+
+                                vertical-alignment: center;
+                            }
+
+
+                            MaterialSelect {
+                                width: 96px;
+                                height: 40px;
+
+                                value <=> root.current_newline;
+
+                                options: [
+                                    "\\r\\n",
+                                    "\\n",
+                                    "\\r",
+                                    "NONE"
+                                ];
+
+                                placeholder: "自定义";
+                            }
+                        }
+
+
+                        // -----------------------------------------------------
+                        // Send Input
+                        // -----------------------------------------------------
+
+                        HorizontalLayout {
+                            height: 48px;
+                            spacing: 12px;
+
+
+                            MaterialTextField {
+                                horizontal-stretch: 1;
+
+                                text <=> root.tx_content;
+                                placeholder: "输入要发送的数据...";
+
+                                accepted => {
+                                    root.send_clicked();
+                                }
+                            }
+
+
+                            MaterialFilledButton {
+                                width: 90px;
+                                height: 48px;
+
+                                text: "发送";
+                                enabled: root.is_connected;
+
+                                clicked => {
+                                    root.send_clicked();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+
+        // ====================================================================
+        // Waveform / Protocol
+        // ====================================================================
+
+        if root.active_tab != 0 : MaterialCard {
+            horizontal-stretch: 1;
+            vertical-stretch: 1;
+
+
+            VerticalLayout {
+                padding: 32px;
+                alignment: center;
+                spacing: 8px;
+
+
+                Text {
+                    text: root.active_tab == 1
+                        ? "波形分析"
+                        : "协议解析";
+
+                    color: MaterialTheme.text_primary;
+                    font-size: 22px;
+                    font-weight: 600;
+
+                    width: 100%;
+
+                    horizontal-alignment: center;
+                }
+
+
+                Text {
+                    text: "该功能正在开发中";
+
+                    color: MaterialTheme.text_secondary;
+                    font-size: 14px;
+
+                    width: 100%;
+
+                    horizontal-alignment: center;
+                }
+            }
+        }
+    }
+}
+

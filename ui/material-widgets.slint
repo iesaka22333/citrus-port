@@ -1,0 +1,476 @@
+import { MaterialTheme } from "material-theme.slint";
+
+export component MaterialCard inherits Rectangle {
+    background: MaterialTheme.surface_container_lowest;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: MaterialTheme.outline_variant;
+}
+
+export component MaterialFilledButton {
+    in property <string> text: "";
+    in property <bool> enabled: true;
+    in property <bool> destructive: false;
+    callback clicked();
+    min-width: 80px;
+    height: 40px;
+
+    Rectangle {
+        border-radius: 20px;
+        background: !root.enabled ? MaterialTheme.surface_container_highest
+            : root.destructive
+                ? (touch.pressed ? MaterialTheme.error.darker(0.12) : touch.has-hover ? MaterialTheme.error.darker(0.08) : MaterialTheme.error)
+                : touch.pressed ? MaterialTheme.primary.darker(0.12)
+                : (touch.has-hover ? MaterialTheme.primary.brighter(0.06) : MaterialTheme.primary);
+        Text {
+            text: root.text;
+            color: !root.enabled ? MaterialTheme.text_disabled : root.destructive ? MaterialTheme.on_error : MaterialTheme.on_primary;
+            font-size: 14px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        touch := TouchArea {
+            clicked => { if (root.enabled) { root.clicked(); } }
+        }
+    }
+}
+
+export component MaterialTonalButton {
+    in property <string> text: "";
+    in property <bool> enabled: true;
+    callback clicked();
+    min-width: 80px;
+    height: 40px;
+
+    Rectangle {
+        border-radius: 20px;
+        background: !root.enabled ? MaterialTheme.surface_container_highest
+            : touch.pressed ? MaterialTheme.on_primary_container
+            : touch.has-hover ? MaterialTheme.primary_container
+            : MaterialTheme.surface_container_high;
+        Text {
+            text: root.text;
+            color: root.enabled ? MaterialTheme.on_surface : MaterialTheme.text_disabled;
+            font-size: 14px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        touch := TouchArea {
+            clicked => { if (root.enabled) { root.clicked(); } }
+        }
+    }
+}
+
+export component MaterialOutlinedButton {
+    in property <string> text: "";
+    in property <bool> enabled: true;
+    callback clicked();
+    min-width: 80px;
+    height: 40px;
+
+    Rectangle {
+        border-radius: 20px;
+        border-width: 1px;
+        border-color: root.enabled ? (touch.has-hover ? MaterialTheme.primary : MaterialTheme.outline) : MaterialTheme.outline_variant;
+        background: !root.enabled ? Colors.transparent
+            : touch.pressed ? MaterialTheme.primary_container
+            : touch.has-hover ? MaterialTheme.primary_container.with-alpha(0.35)
+            : Colors.transparent;
+        Text {
+            text: root.text;
+            color: root.enabled ? MaterialTheme.on_surface : MaterialTheme.text_disabled;
+            font-size: 14px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        touch := TouchArea {
+            clicked => { if (root.enabled) { root.clicked(); } }
+        }
+    }
+}
+
+
+export component MaterialNavigationItem {
+    in property <string> icon: "";
+    in property <string> label: "";
+    in property <bool> selected: false;
+
+    callback clicked();
+
+    width: 80px;
+    height: 64px;
+
+    touch := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    // 图标胶囊
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: 0px;
+
+        width: 64px;
+        height: 32px;
+
+        border-radius: 16px;
+
+        background: root.selected
+            ? MaterialTheme.primary_container
+            : Colors.transparent;
+
+        Text {
+            width: parent.width;
+            height: parent.height;
+
+            text: root.icon;
+            font-family: "Material Symbols Rounded";
+            font-size: 24px;
+
+            color: root.selected
+                ? MaterialTheme.on_primary_container
+                : MaterialTheme.text_secondary;
+
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    // 标签
+    Text {
+        x: 0px;
+        y: 34px;
+
+        width: parent.width;
+        height: 20px;
+
+        text: root.label;
+
+        color: root.selected
+            ? MaterialTheme.text_primary
+            : MaterialTheme.text_secondary;
+
+        font-size: 12px;
+        font-weight: root.selected ? 600 : 500;
+
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+
+export component MaterialSelect {
+    in property <[string]> options: [];
+    in-out property <string> value: "";
+    in property <string> placeholder: "";
+    height: 48px;
+    min-width: 80px;
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: touch.pressed
+            ? MaterialTheme.control_border_focus
+            : touch.has-hover ? MaterialTheme.control_border_focus : MaterialTheme.control_border;
+        background: touch.pressed
+            ? MaterialTheme.control_background_hover
+            : touch.has-hover ? MaterialTheme.control_background_hover : MaterialTheme.control_background;
+
+        // 选中值 / 占位文本：宽度由父控件决定，长文本省略显示，
+        // 避免内容反过来撑大父控件尺寸。
+        Text {
+            text: root.value == "" ? root.placeholder : root.value;
+            x: 16px;
+            width: max(0px, parent.width - 52px);
+            height: parent.height;
+            color: root.value == "" ? MaterialTheme.text_secondary : MaterialTheme.text_primary;
+            font-size: 14px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        // 下拉箭头图标
+        Rectangle {
+            x: parent.width - 40px;
+            y: 0px;
+            width: 40px;
+            height: parent.height;
+            background: Colors.transparent;
+
+            Text {
+                text: "expand_more";
+                font-family: "Material Symbols Rounded";
+                color: MaterialTheme.text_secondary;
+                font-size: 24px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        touch := TouchArea { clicked => { popup.show(); } }
+    }
+
+    popup := PopupWindow {
+        x: 0px;
+        y: root.height + 4px;
+        width: max(root.width, 160px);
+
+        Rectangle {
+            background: MaterialTheme.surface_container_lowest;
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: MaterialTheme.outline_variant;
+
+            VerticalLayout {
+                padding: 6px;
+                spacing: 0px;
+
+                // 选项列表：超过最大高度时内部滚动，防止撑大 popup。
+                list_flick := Flickable {
+                    height: min(options_col.preferred-height, 300px);
+                    viewport-height: options_col.preferred-height;
+
+                    options_col := VerticalLayout {
+                        width: 100%;
+                        spacing: 2px;
+
+                        for option in root.options : Rectangle {
+                            height: 40px;
+                            border-radius: 8px;
+                            background: option_touch.has-hover ? MaterialTheme.primary_container : Colors.transparent;
+
+                            Text {
+                                text: option;
+                                x: 12px;
+                                width: max(0px, parent.width - 24px);
+                                height: parent.height;
+                                color: option_touch.has-hover ? MaterialTheme.on_primary_container : MaterialTheme.text_primary;
+                                font-size: 14px;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+
+                            option_touch := TouchArea {
+                                clicked => { root.value = option; popup.close(); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component SectionTitle {
+    in property <string> text: "";
+    height: 24px;
+    Text {
+        text: root.text;
+        color: MaterialTheme.text_primary;
+        font-size: 16px;
+        font-weight: 600;
+        vertical-alignment: center;
+    }
+}
+
+export component FieldLabel {
+    in property <string> text: "";
+    height: 20px;
+    Text {
+        text: root.text;
+        color: MaterialTheme.text_secondary;
+        font-size: 12px;
+        font-weight: 500;
+        vertical-alignment: center;
+    }
+}
+
+export component MaterialCheckbox {
+    in property <string> text: "";
+    in-out property <bool> checked: false;
+    in property <bool> enabled: true;
+    callback toggled();
+    min-height: 24px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        box := Rectangle {
+            width: 20px;
+            height: 20px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 4px;
+            border-width: 2px;
+            border-color: !root.enabled ? MaterialTheme.outline_variant : root.checked ? MaterialTheme.primary : touch.has-hover ? MaterialTheme.on_surface : MaterialTheme.outline;
+            background: !root.enabled ? (root.checked ? MaterialTheme.surface_container_highest : Colors.transparent) : root.checked ? MaterialTheme.primary : Colors.transparent;
+            if root.checked : Text {
+                text: "check"; // <--- 改为 Material Symbols 的 "check" 图标
+                font-family: "Material Symbols Rounded"; // <--- 声明使用新引入的图标字体
+                color: !root.enabled ? MaterialTheme.text_disabled : MaterialTheme.on_primary;
+                font-size: 14px; // 保持你原来的字号
+                font-weight: 800;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+        Text {
+            text: root.text;
+            color: !root.enabled ? MaterialTheme.text_disabled : MaterialTheme.text_primary;
+            font-size: 14px;
+            vertical-alignment: center;
+        }
+    }
+    touch := TouchArea {
+        clicked => {
+            if (root.enabled) {
+                root.checked = !root.checked;
+                root.toggled();
+            }
+        }
+    }
+}
+
+export component MaterialTextField {
+    in-out property <string> text: "";
+    in property <string> placeholder: "";
+    in property <bool> enabled: true;
+    in property <bool> read_only: false;
+    callback accepted();
+    min-height: 48px;
+    min-width: 120px;
+
+    Rectangle {
+        border-radius: 8px;
+        border-width: input.has-focus ? 2px : 1px;
+        border-color: !root.enabled ? MaterialTheme.outline_variant : input.has-focus ? MaterialTheme.control_border_focus : MaterialTheme.control_border;
+        background: !root.enabled ? MaterialTheme.surface_container_highest : MaterialTheme.control_background;
+        if root.text == "" && root.placeholder != "" : Text {
+            x: 12px;
+            width: parent.width - 24px;
+            height: parent.height;
+            text: root.placeholder;
+            color: MaterialTheme.text_disabled;
+            font-size: 14px;
+            vertical-alignment: center;
+        }
+        input := TextInput {
+            x: 12px;
+            y: 0px;
+            width: parent.width - 24px;
+            height: parent.height;
+            text <=> root.text;
+            enabled: root.enabled;
+            read-only: root.read_only;
+            color: !root.enabled ? MaterialTheme.text_disabled : MaterialTheme.text_primary;
+            font-size: 14px;
+            vertical-alignment: center;
+            single-line: true;
+            accepted => { root.accepted(); }
+        }
+    }
+}
+
+export component MaterialTextArea {
+    in-out property <string> text: "";
+    in property <string> placeholder: "";
+    in property <bool> enabled: true;
+    in property <bool> read_only: false;
+    min-height: 80px;
+    min-width: 120px;
+
+    Rectangle {
+        border-radius: 12px;
+        border-width: input.has-focus ? 2px : 1px;
+        border-color: !root.enabled ? MaterialTheme.outline_variant : input.has-focus ? MaterialTheme.control_border_focus : MaterialTheme.control_border;
+        background: !root.enabled ? MaterialTheme.surface_container_highest : MaterialTheme.surface_container_low;
+        if root.text == "" && root.placeholder != "" : Text {
+            x: 12px;
+            y: 12px;
+            width: parent.width - 24px;
+            text: root.placeholder;
+            color: MaterialTheme.text_disabled;
+            font-size: 14px;
+            vertical-alignment: top;
+        }
+        Flickable {
+            x: 12px;
+            y: 12px;
+            width: parent.width - 24px;
+            height: parent.height - 24px;
+            viewport-height: input.preferred-height;
+            input := TextInput {
+                width: 100%;
+                height: 100%;
+                text <=> root.text;
+                enabled: root.enabled;
+                read-only: root.read_only;
+                color: !root.enabled ? MaterialTheme.text_disabled : MaterialTheme.text_primary;
+                font-size: 14px;
+                wrap: word-wrap;
+                single-line: false;
+            }
+        }
+    }
+}
+
+
+export component MaterialReceiveView {
+    in-out property <string> text: "";
+    in property <bool> enabled: true;
+    in property <bool> auto_scroll: true;
+
+    min-width: 120px;
+    min-height: 80px;
+
+    Rectangle {
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: MaterialTheme.outline_variant;
+        background: MaterialTheme.surface_container_low;
+
+        // ================================================================
+        // 接收数据显示区域
+        // ================================================================
+
+        Flickable {
+            x: 12px;
+            y: 12px;
+
+            width: parent.width - 24px;
+            height: parent.height - 24px;
+
+
+            // 内容高度由 Text 自己决定。
+            viewport-height: content.preferred-height;
+
+            // ============================================================
+            // 接收文本
+            // ============================================================
+
+            content := Text {
+                width: parent.width;
+
+                text: root.text;
+
+                color: root.enabled
+                    ? MaterialTheme.text_primary
+                    : MaterialTheme.text_disabled;
+
+                font-size: 14px;
+
+                // 长行自动换行，避免横向滚动。
+                wrap: word-wrap;
+
+                vertical-alignment: top;
+            }
+        }
+    }
+}
+
+
