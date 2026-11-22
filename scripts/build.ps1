@@ -143,7 +143,11 @@ function Get-HostTriple {
     if (-not (Get-Command rustc -ErrorAction SilentlyContinue)) {
         return "unknown"
     }
-    $line = (& rustc -vV 2>$null) |
+    $result = Invoke-NativeCommand -FilePath "rustc" -Arguments @("-vV")
+    if ($result.ExitCode -ne 0) {
+        return "unknown"
+    }
+    $line = ($result.Output -split "`r?`n") |
         Where-Object { $_ -match '^host:\s*' } |
         Select-Object -First 1
     if ($null -eq $line) {
@@ -185,8 +189,9 @@ function Ensure-Target {
         return
     }
     if (Get-Command rustup -ErrorAction SilentlyContinue) {
-        $installed = @(& rustup target list --installed 2>$null)
-        if ($installed -notcontains $Target) {
+        $result = Invoke-NativeCommand -FilePath "rustup" -Arguments @("target", "list", "--installed")
+        $installed = @($result.Output -split "`r?`n")
+        if ($result.ExitCode -ne 0 -or $installed -notcontains $Target) {
             Fail "Rust target '$Target' is not installed. Run: rustup target add $Target"
         }
     }
@@ -198,15 +203,58 @@ function Ensure-Target {
     }
 }
 
+function Invoke-NativeCommand {
+    param(
+        [string]$FilePath,
+        [string[]]$Arguments,
+        [switch]$Echo
+    )
+
+    $outputLines = @()
+    $previousErrorAction = $ErrorActionPreference
+    $previousNativeErrorAction = $null
+    $hasNativePreference = $null -ne (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue)
+    if ($hasNativePreference) {
+        $previousNativeErrorAction = $PSNativeCommandUseErrorActionPreference
+        $PSNativeCommandUseErrorActionPreference = $false
+    }
+
+    # Native stderr is normal for cargo progress/warnings. Do not let
+    # $ErrorActionPreference = "Stop" turn it into a terminating error.
+    $ErrorActionPreference = "Continue"
+    $exitCode = 1
+    try {
+        if ($Echo) {
+            # Tee captures the lines, Out-Host consumes them so the function
+            # only returns the result object (no string array in the pipeline).
+            & $FilePath @Arguments 2>&1 | Tee-Object -Variable outputLines | Out-Host
+        }
+        else {
+            $outputLines = @(& $FilePath @Arguments 2>&1)
+        }
+        $exitCode = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorAction
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativeErrorAction
+        }
+    }
+
+    $text = (@($outputLines) | ForEach-Object { [string]$_ }) -join "`n"
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        Output = $text
+    }
+}
+
 function Invoke-CargoStep {
     param([string[]]$CargoArgs)
     Write-Host "==> cargo $($CargoArgs -join ' ')"
-    $cargoLines = @()
     $previousColor = $env:CARGO_TERM_COLOR
     $env:CARGO_TERM_COLOR = "never"
     try {
-        & cargo @CargoArgs 2>&1 | Tee-Object -Variable cargoLines
-        $code = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+        return Invoke-NativeCommand -FilePath "cargo" -Arguments $CargoArgs -Echo
     }
     finally {
         if ($null -eq $previousColor) {
@@ -215,10 +263,6 @@ function Invoke-CargoStep {
         else {
             $env:CARGO_TERM_COLOR = $previousColor
         }
-    }
-    return [pscustomobject]@{
-        ExitCode = $code
-        Output = (($cargoLines | Out-String -Width 4096))
     }
 }
 
@@ -252,8 +296,18 @@ function Initialize-Report {
     if ($parent -and -not (Test-Path -LiteralPath $parent)) {
         New-Item -ItemType Directory -Force -Path $parent | Out-Null
     }
-    $rustVersion = if (Get-Command rustc -ErrorAction SilentlyContinue) { & rustc --version } else { "unknown" }
-    $cargoVersion = if (Get-Command cargo -ErrorAction SilentlyContinue) { & cargo --version } else { "unknown" }
+    $rustVersion = if (Get-Command rustc -ErrorAction SilentlyContinue) {
+        (Invoke-NativeCommand -FilePath "rustc" -Arguments @("--version")).Output.Trim()
+    }
+    else {
+        "unknown"
+    }
+    $cargoVersion = if (Get-Command cargo -ErrorAction SilentlyContinue) {
+        (Invoke-NativeCommand -FilePath "cargo" -Arguments @("--version")).Output.Trim()
+    }
+    else {
+        "unknown"
+    }
     $osDescription = [System.Environment]::OSVersion.VersionString
     $header = @(
         "CitrusPort Test Report",
@@ -329,9 +383,10 @@ $profiles = @(Get-Profiles)
 
 if ($DoClean) {
     Write-Host "==> cargo clean"
-    & cargo clean
-    if ($LASTEXITCODE -ne 0) {
-        exit $LASTEXITCODE
+    $clean = Invoke-NativeCommand -FilePath "cargo" -Arguments @("clean") -Echo
+    if ($clean.ExitCode -ne 0) {
+        $global:LASTEXITCODE = $clean.ExitCode
+        exit $clean.ExitCode
     }
 }
 

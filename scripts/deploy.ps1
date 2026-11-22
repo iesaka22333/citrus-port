@@ -128,11 +128,58 @@ if (-not [System.IO.Path]::IsPathRooted($OutDir)) {
     $OutDir = Join-Path $RootDir $OutDir
 }
 
+function Invoke-NativeCommand {
+    param(
+        [string]$FilePath,
+        [string[]]$Arguments,
+        [switch]$Echo
+    )
+
+    $outputLines = @()
+    $previousErrorAction = $ErrorActionPreference
+    $previousNativeErrorAction = $null
+    $hasNativePreference = $null -ne (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue)
+    if ($hasNativePreference) {
+        $previousNativeErrorAction = $PSNativeCommandUseErrorActionPreference
+        $PSNativeCommandUseErrorActionPreference = $false
+    }
+
+    # Native stderr is normal for tools such as tar. Keep it from becoming a
+    # terminating error because the script sets ErrorActionPreference = Stop.
+    $ErrorActionPreference = "Continue"
+    $exitCode = 1
+    try {
+        if ($Echo) {
+            & $FilePath @Arguments 2>&1 | Tee-Object -Variable outputLines | Out-Host
+        }
+        else {
+            $outputLines = @(& $FilePath @Arguments 2>&1)
+        }
+        $exitCode = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorAction
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativeErrorAction
+        }
+    }
+
+    $text = (@($outputLines) | ForEach-Object { [string]$_ }) -join "`n"
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        Output = $text
+    }
+}
+
 function Get-HostTriple {
     if (-not (Get-Command rustc -ErrorAction SilentlyContinue)) {
         return "unknown"
     }
-    $line = (& rustc -vV 2>$null) |
+    $result = Invoke-NativeCommand -FilePath "rustc" -Arguments @("-vV")
+    if ($result.ExitCode -ne 0) {
+        return "unknown"
+    }
+    $line = ($result.Output -split "`r?`n") |
         Where-Object { $_ -match '^host:\s*' } |
         Select-Object -First 1
     if ($null -eq $line) {
@@ -264,10 +311,14 @@ foreach ($spec in $specs) {
             Compress-Archive -Path $packageDir -DestinationPath $archive -Force
         }
         else {
+            if (-not (Get-Command tar -ErrorAction SilentlyContinue)) {
+                Fail "tar is required to create .tar.gz packages on Windows"
+            }
             $archive = Join-Path $OutDir "$packageName.tar.gz"
-            & tar -czf $archive -C $stage $packageName
-            if ($LASTEXITCODE -ne 0) {
-                Fail "tar packaging failed with exit code $LASTEXITCODE"
+            $tar = Invoke-NativeCommand -FilePath "tar" `
+                -Arguments @("-czf", $archive, "-C", $stage, $packageName) -Echo
+            if ($tar.ExitCode -ne 0) {
+                Fail "tar packaging failed with exit code $($tar.ExitCode)"
             }
         }
 
