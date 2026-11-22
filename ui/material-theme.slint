@@ -1,54 +1,148 @@
 // ============================================================================
-// CitrusPort Material 3 Theme
+// CitrusPort Material 3 theme tokens
+//
+// `theme-id` selects one of:
+//   citrus-dark | citrus-light | catppuccin-mocha
+// All UI colors should come from these semantic tokens.
 // ============================================================================
 
 export global MaterialTheme {
-    // ------------------------------------------------------------------------
-    // Primary
-    // ------------------------------------------------------------------------
-    in property <color> primary: #8a5100;
-    in property <color> on_primary: #ffffff;
-    in property <color> primary_container: #ffddb0;
-    in property <color> on_primary_container: #2c1600;
+    in-out property <string> theme-id: "citrus-dark";
+
+    out property <bool> is_dark: theme-id != "citrus-light";
 
     // ------------------------------------------------------------------------
-    // Background & Surface
+    // Primary / secondary
     // ------------------------------------------------------------------------
-    in property <color> background: #fff8f4;
-    in property <color> on_background: #211a14;
-    in property <color> surface: #fff8f4;
-    in property <color> on_surface: #211a14;
-    in property <color> surface_container_lowest: #ffffff;
-    in property <color> surface_container_low: #fdf1e8;
-    in property <color> surface_container: #f8ece3;
-    in property <color> surface_container_high: #f2e6dd;
-    in property <color> surface_container_highest: #ece0d7;
+    out property <color> primary: theme-id == "citrus-light" ? #9C4400
+        : theme-id == "catppuccin-mocha" ? #FAB387
+        : #FFB784;
+    out property <color> on_primary: theme-id == "citrus-light" ? #FFFFFF
+        : theme-id == "catppuccin-mocha" ? #2B1A10
+        : #4A2500;
+    out property <color> primary_container: theme-id == "citrus-light" ? #FFDBC8
+        : theme-id == "catppuccin-mocha" ? #5A3A2A
+        : #6B3A10;
+    out property <color> on_primary_container: theme-id == "citrus-light" ? #341100
+        : theme-id == "catppuccin-mocha" ? #FFE0CC
+        : #FFDCBF;
+
+    out property <color> secondary: theme-id == "citrus-light" ? #77574A
+        : theme-id == "catppuccin-mocha" ? #94E2D5
+        : #E7C09B;
+    out property <color> on_secondary: theme-id == "citrus-light" ? #FFFFFF
+        : theme-id == "catppuccin-mocha" ? #0B2F2B
+        : #442B14;
+    out property <color> secondary_container: theme-id == "citrus-light" ? #FFDBCB
+        : theme-id == "catppuccin-mocha" ? #2A4F4A
+        : #5E4228;
+    out property <color> on_secondary_container: theme-id == "citrus-light" ? #2C160B
+        : theme-id == "catppuccin-mocha" ? #C8FFF5
+        : #FFDCBF;
 
     // ------------------------------------------------------------------------
-    // Outline & Error
+    // Surfaces
     // ------------------------------------------------------------------------
-    in property <color> outline: #81766c;
-    in property <color> outline_variant: #d4c3b6;
-    in property <color> error: #ba1a1a;
-    in property <color> on_error: #ffffff;
-    in property <color> error_container: #ffdad6;
-    in property <color> on_error_container: #410002;
+    out property <color> surface: theme-id == "citrus-light" ? #FFF8F5
+        : theme-id == "catppuccin-mocha" ? #1E1E2E
+        : #18120F;
+    out property <color> on_surface: theme-id == "citrus-light" ? #211A17
+        : theme-id == "catppuccin-mocha" ? #CDD6F4
+        : #F2E0D5;
+    out property <color> on_surface_variant: theme-id == "citrus-light" ? #53433B
+        : theme-id == "catppuccin-mocha" ? #BAC2DE
+        : #D8C2B4;
+
+    out property <color> surface_container_lowest: theme-id == "citrus-light" ? #FFFFFF
+        : theme-id == "catppuccin-mocha" ? #181825
+        : #120D0A;
+    out property <color> surface_container_low: theme-id == "citrus-light" ? #FFF1EA
+        : theme-id == "catppuccin-mocha" ? #232334
+        : #1C1511;
+    out property <color> surface_container: theme-id == "citrus-light" ? #F9E9DF
+        : theme-id == "catppuccin-mocha" ? #313244
+        : #231B15;
+    out property <color> surface_container_high: theme-id == "citrus-light" ? #F3E2D8
+        : theme-id == "catppuccin-mocha" ? #45475A
+        : #2D231B;
+    out property <color> surface_container_highest: theme-id == "citrus-light" ? #EDDCD2
+        : theme-id == "catppuccin-mocha" ? #585B70
+        : #392C22;
 
     // ------------------------------------------------------------------------
-    // Typography
+    // Outline and status
     // ------------------------------------------------------------------------
-    in property <color> text_primary: #211a14;
-    in property <color> text_secondary: #625a52;
-    in property <color> text_disabled: #938a82;
-    in property <color> text_on_primary: #ffffff;
-    in property <color> text_on_primary_container: #2c1600;
+    out property <color> outline: theme-id == "citrus-light" ? #85736A
+        : theme-id == "catppuccin-mocha" ? #7F849C
+        : #A08C7F;
+    out property <color> outline_variant: theme-id == "citrus-light" ? #D8C2B8
+        : theme-id == "catppuccin-mocha" ? #585B70
+        : #4F4137;
+
+    out property <color> error: theme-id == "citrus-light" ? #BA1A1A
+        : theme-id == "catppuccin-mocha" ? #F38BA8
+        : #FFB4AB;
+    out property <color> on_error: theme-id == "citrus-light" ? #FFFFFF
+        : theme-id == "catppuccin-mocha" ? #11111B
+        : #690005;
+    out property <color> error_container: theme-id == "citrus-light" ? #FFDAD6
+        : theme-id == "catppuccin-mocha" ? #5A2A3A
+        : #93000A;
+    out property <color> on_error_container: theme-id == "citrus-light" ? #410002
+        : theme-id == "catppuccin-mocha" ? #FFD9E2
+        : #FFDAD6;
+    out property <color> success: theme-id == "citrus-light" ? #2E7D32
+        : theme-id == "catppuccin-mocha" ? #A6E3A1
+        : #8BD5A0;
 
     // ------------------------------------------------------------------------
-    // Control
+    // Compatibility aliases used by existing widgets
     // ------------------------------------------------------------------------
-    in property <color> control_background: #fffaf7;
-    in property <color> control_background_hover: #f8eee6;
-    in property <color> control_background_pressed: #f0e2d7;
-    in property <color> control_border: #81766c;
-    in property <color> control_border_focus: #8a5100;
+    out property <color> background: surface;
+    out property <color> on_background: on_surface;
+    out property <color> text_primary: on_surface;
+    out property <color> text_secondary: on_surface_variant;
+    out property <color> text_disabled: theme-id == "citrus-light" ? #8F837B
+        : theme-id == "catppuccin-mocha" ? #6C7086
+        : #8A7A6E;
+    out property <color> text_on_primary: on_primary;
+    out property <color> text_on_primary_container: on_primary_container;
+
+    // ------------------------------------------------------------------------
+    // Controls
+    // ------------------------------------------------------------------------
+    out property <color> control_background: theme-id == "citrus-light" ? #FFFAF7
+        : theme-id == "catppuccin-mocha" ? #313244
+        : #201813;
+    out property <color> control_background_hover: theme-id == "citrus-light" ? #F8EEE6
+        : theme-id == "catppuccin-mocha" ? #45475A
+        : #2B211A;
+    out property <color> control_background_pressed: theme-id == "citrus-light" ? #F0E2D7
+        : theme-id == "catppuccin-mocha" ? #585B70
+        : #392C22;
+    out property <color> control_border: outline;
+    out property <color> control_border_focus: primary;
+
+    // ------------------------------------------------------------------------
+    // Serial terminal
+    // ------------------------------------------------------------------------
+    out property <color> terminal_bg: theme-id == "citrus-light" ? #FCF4EF
+        : theme-id == "catppuccin-mocha" ? #11111B
+        : #130E0B;
+    out property <color> rx_text: theme-id == "citrus-light" ? #211A17
+        : theme-id == "catppuccin-mocha" ? #CDD6F4
+        : #F2E0D5;
+    out property <color> tx_text: theme-id == "citrus-light" ? #9C4400
+        : theme-id == "catppuccin-mocha" ? #FAB387
+        : #FFB784;
+    out property <color> timestamp_text: theme-id == "citrus-light" ? #85736A
+        : theme-id == "catppuccin-mocha" ? #7F849C
+        : #A08C7F;
+
+    // ------------------------------------------------------------------------
+    // Palette preview dots for the settings page
+    // ------------------------------------------------------------------------
+    out property <color> palette_preview_citrus_dark: #FFB784;
+    out property <color> palette_preview_citrus_light: #9C4400;
+    out property <color> palette_preview_catppuccin_mocha: #FAB387;
 }

@@ -33,6 +33,7 @@ Rust + Slint · 文本与 HEX · UTF-8 / GBK / ASCII · RTS / CTS / Break · 进
 | **文本与字节** | 支持 UTF-8、GBK、ASCII、HEX 发送、可选换行和精确字节控制。 |
 | **好用的日志** | 时间戳、拖选复制、`Ctrl+C`、自动滚屏、清空和保存文件。 |
 | **真实控制线** | CTS 状态显示，RTS 与 Break 通过 `serialport` 实际操作。 |
+| **双语与主题** | 实时中英切换，内置三套 Material 3 配色，偏好跨启动保留。 |
 | **可回归** | Unix 进程内 PTY 测试、Windows COM 配对测试和共用收发场景。 |
 
 ---
@@ -49,8 +50,10 @@ Rust + Slint · 文本与 HEX · UTF-8 / GBK / ASCII · RTS / CTS / Break · 进
 | 📈 | **字节计数** | 工具栏显示原始 RX 字节数和成功写入的 TX 字节数。 |
 | 🎛️ | **控制线** | CTS 周期读取并显示；RTS 和 Break 已接入串口操作。 |
 | 🧹 | **日志操作** | 清空接收区，或保存到用户主目录下的 `citrusport-rx-<时间戳>.log`。 |
+| 🌐 | **语言与主题** | 在设置页切换中英文与“橘子深色 / 橘子浅色 / Catppuccin Mocha”，不会中断连接。 |
+| 💾 | **偏好记忆** | `lang` 与 `theme-id` 保存到 `citrus-port/config.toml`，非法值静默回退。 |
 | ⚠️ | **错误处理** | 读写出错会写入日志、关闭串口，并丢弃未确认的发送记录。 |
-| 🧪 | **测试** | Linux 上 15 个常规测试，包括 PTY 字节级双向校验和重连循环。 |
+| 🧪 | **测试** | Linux 上 20 个常规测试，包括 PTY 字节级双向校验、重连循环和设置持久化。 |
 
 ---
 
@@ -171,7 +174,7 @@ cargo test --locked                # 当前平台的常规测试
 
 | 套件 | 命令 | 说明 |
 | :-- | :-- | :-- |
-| 常规测试 | `cargo test --locked --offline` | x86_64 Linux 上 15 个测试（11 个库测试 + 4 个 PTY 测试）。 |
+| 常规测试 | `cargo test --locked --offline` | x86_64 Linux 上 20 个测试（16 个库测试 + 4 个 PTY 测试）。 |
 | Unix PTY | `cargo test --locked --offline --test pty_regression` | 进程内 PTY 对，不需要 `socat`。 |
 | Windows COM | `cargo test --locked --offline --test com_regression -- --ignored --nocapture` | 需要 `CITRUS_TEST_PORT_A` 和 `CITRUS_TEST_PORT_B`。 |
 
@@ -199,8 +202,8 @@ flowchart LR
 
 | 层 | 职责 |
 | :-- | :-- |
-| **UI** | Slint 组件和 Material 风格控件。所有属性更新都在 UI 线程完成。 |
-| **应用层** | 注册回调、构造 `SendRequest`、合并接收事件、文本解码、维护字节计数，并以约 30 Hz 刷新日志。 |
+| **UI** | Slint 组件和 Material 风格控件。`ui/i18n.slint` 提供双语文案，`MaterialTheme.theme-id` 选择配色，所有属性更新都在 UI 线程完成。 |
+| **应用层** | 注册回调、构造 `SendRequest`、合并接收事件、文本解码、维护字节计数，以约 30 Hz 刷新日志，并持久化语言/主题设置。 |
 | **串口 worker** | `SerialPort` 的唯一持有者。处理打开/关闭/发送、批量上报、CTS 轮询和读写失败。 |
 | **通道** | `crossbeam-channel` 把 `Command` 发给 worker，把 `Event` 回投给应用层。 |
 | **测试** | Unix PTY 和 Windows COM 目标共用收发、重连、编码和性能场景。 |
@@ -244,6 +247,7 @@ x86_64 Linux、dev profile、进程内 PTY、512 B × 400 帧的本地基线：
 - [x] CTS 显示以及 RTS/Break 控制线操作。
 - [x] PTY 回归、COM 治具、共用场景和英文报告。
 - [x] Linux/Windows 构建、测试、打包脚本和 CI 发布流程。
+- [x] 设置页支持实时中英切换、三套 Material 3 主题和偏好持久化。
 - [ ] 在真实硬件上验证 Windows 原生构建、PowerShell 脚本和 COM 配对。
 - [ ] 用设备验证 CTS/RTS/Break、硬件流控和 USB 拔插。
 - [ ] 为 RTS/CTS 暂停/恢复验收增加成对虚拟 UART 驱动。

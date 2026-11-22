@@ -27,9 +27,10 @@ User-facing documentation lives in [README.md](README.md). This guide is intenti
 | Path | Responsibility |
 | --- | --- |
 | `build.rs`, `src/lib.rs`, `src/main.rs` | Compile `ui/app-window.slint`. The library exports `serial`, `app`, and Slint components. `main.rs` only creates `MainWindow` and calls `App::run`. |
-| `ui/app-window.slint` | Main window, serial settings, receive/send panels, navigation rail. |
-| `ui/material-widgets.slint`, `ui/material-theme.slint` | Custom Material-style widgets and colors. `MaterialPortField` supports manual entry plus discovery; `MaterialReceiveView` is the log view. |
-| `src/app.rs`, `src/app/tests.rs` | UI callbacks, event pump, receive decoding/log state, byte counts, pending TX display queue, `SendRequest`. Private-state tests and log performance sampling live in `src/app/tests.rs`. |
+| `ui/app-window.slint` | Main window, serial settings, receive/send panels, navigation rail, and the settings page (language + theme). |
+| `ui/i18n.slint` | Global `I18n` dictionary. Every user-facing string is a computed property selected by `lang` (`zh` or `en`). |
+| `ui/material-widgets.slint`, `ui/material-theme.slint` | Material-style widgets and semantic color tokens. `MaterialTheme.theme-id` selects `citrus-dark`, `citrus-light`, or `catppuccin-mocha`. `MaterialPortField` supports manual entry plus discovery; `MaterialReceiveView` is the log view. |
+| `src/app.rs`, `src/app/tests.rs` | UI callbacks, event pump, receive decoding/log state, byte counts, pending TX display queue, `SendRequest`, and settings persistence. Private-state tests and log performance sampling live in `src/app/tests.rs`. |
 | `src/serial/manager.rs` | Worker thread owns `SerialPort`; commands and events use `crossbeam-channel`. Port discovery runs about every 3 s; CTS is polled about every 250 ms. |
 | `src/serial/{config,event,error,encoder,decoder,format}.rs` | Serial config, commands/events, errors, UTF-8/GBK/ASCII codecs, HEX and newline conversion. |
 | `tests/pty_regression.rs`, `tests/common/mod.rs` | Unix PTY fixture and shared cross-platform transfer scenarios. |
@@ -55,6 +56,8 @@ flowchart LR
 - `SendRequest` is the shared text/HEX/encoding/newline entry point for the UI and tests.
 - `Disconnected` resets the decoder and clears unconfirmed pending TX entries.
 - Port names are passed through exactly as entered when they are not found in the discovery cache.
+- Language and theme changes only update Slint properties; they never touch the serial worker or buffers.
+- `lang` and `theme-id` persist to `citrus-port/config.toml` under `XDG_CONFIG_HOME`/`~/.config` (Linux) or `APPDATA` (Windows). Missing or invalid values fall back silently to `zh` and `citrus-dark`.
 
 ## Invariants
 
@@ -65,13 +68,15 @@ flowchart LR
 - Preserve the `Command` / `Event` contract when adding features.
 - Keep platform-specific tests behind `#![cfg(unix)]` or `#![cfg(windows)]`.
 - Keep test report labels and summaries in English.
+- Add user-facing strings to `ui/i18n.slint`; do not hardcode display text in `.slint` files.
+- Use `MaterialTheme` semantic tokens for colors so every theme stays consistent.
 - Do not pass `--offline` in CI build steps; GitHub runners need network access for the first build.
 
 ## Testing
 
-On x86_64 Linux, `cargo test --locked --offline` currently runs **15 regular tests**:
+On x86_64 Linux, `cargo test --locked --offline` currently runs **20 regular tests**:
 
-- 11 library tests: port resolution, send encoding, counters, reconnect queue, RX trim.
+- 16 library tests: port resolution, send encoding, counters, reconnect queue, RX trim, settings defaults/round-trip/fallback, localized backend text and serial errors.
 - 4 PTY tests: bidirectional bytes, repeated close/reopen, peer disconnect, application send paths.
 
 Two performance samples are `#[ignore]`:
@@ -100,6 +105,7 @@ The report contains platform, target, profile, command, exit code, PASS/FAIL, pa
 - CTS/RTS/Break, hardware flow control, USB removal, and real-device timing need hardware validation.
 - The paired virtual UART driver for RTS/CTS pause/resume acceptance is not implemented.
 - A controllable fake backend for write-failure logging tests is still missing.
+- Live language/theme switching and restart persistence have been compile/test checked, but still need manual GUI verification.
 - Waveform and protocol-analysis tabs are placeholders.
 
 ## CI and release

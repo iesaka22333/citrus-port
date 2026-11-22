@@ -5,6 +5,8 @@
 // Command 用于 App -> worker，Event 用于 worker -> App。
 // ============================================================================
 
+use std::fmt;
+
 use crate::serial::config::SerialConfig;
 
 /// 发送给串口 worker 线程的命令。
@@ -34,14 +36,41 @@ pub enum Event {
     Received(Vec<u8>),
     /// 数据已成功写入串口（写入成功后才发出，原始 bytes）
     Sent(Vec<u8>),
-    /// 错误信息
-    Error(String),
+    /// 错误信息（同时携带中文和英文文本，由 App 层按当前语言选择）
+    Error(LocalizedMessage),
     /// 可用端口列表发生变化（与「枚举失败」严格区分）
     PortsChanged(Vec<PortInfo>),
     /// 端口枚举失败（区别于"真的没有端口"）
-    PortEnumerationError(String),
+    PortEnumerationError(LocalizedMessage),
     /// CTS 输入状态发生变化（由 worker 周期读取）
     CtsState(bool),
+}
+
+/// 预生成的双语消息，避免 worker 线程依赖 UI 语言状态。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalizedMessage {
+    pub zh: String,
+    pub en: String,
+}
+
+impl LocalizedMessage {
+    pub fn new(zh: impl Into<String>, en: impl Into<String>) -> Self {
+        Self {
+            zh: zh.into(),
+            en: en.into(),
+        }
+    }
+
+    /// 按 UI 语言选择文本；未知语言回退到中文。
+    pub fn text(&self, lang: &str) -> &str {
+        if lang == "en" { &self.en } else { &self.zh }
+    }
+}
+
+impl fmt::Display for LocalizedMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.zh)
+    }
 }
 
 /// 端口信息：区分实际端口名与用于 UI 显示的文本。

@@ -20,7 +20,7 @@ use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 
 use crate::serial::config::SerialConfig;
 use crate::serial::error::SerialError;
-use crate::serial::event::{Command, Event, PortInfo};
+use crate::serial::event::{Command, Event, LocalizedMessage, PortInfo};
 
 /// 串口后端管理器：持有命令发送端与 worker / poll 线程句柄。
 pub struct SerialManager {
@@ -211,8 +211,9 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
                             let _ = event_tx.send(Event::Connected);
                         }
                         Err(e) => {
-                            let _ = event_tx
-                                .send(Event::Error(format!("打开串口 {} 失败: {e}", cfg.port)));
+                            let zh = format!("打开串口 {} 失败: {e}", cfg.port);
+                            let en = format!("Failed to open {}: {}", cfg.port, e.localized("en"));
+                            let _ = event_tx.send(Event::Error(LocalizedMessage::new(zh, en)));
                         }
                     }
                 }
@@ -238,20 +239,32 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
                                 port = None;
                                 last_cts = None;
                                 last_cts_poll = None;
-                                let _ = event_tx.send(Event::Error(format!("发送失败: {e}")));
+                                let message = LocalizedMessage::new(
+                                    format!("发送失败: {e}"),
+                                    format!("Send failed: {e}"),
+                                );
+                                let _ = event_tx.send(Event::Error(message));
                                 let _ = event_tx.send(Event::Disconnected);
                             }
                         }
                     }
                     None => {
-                        let _ = event_tx.send(Event::Error("未连接串口，无法发送".to_string()));
+                        let message = LocalizedMessage::new(
+                            "未连接串口，无法发送",
+                            "Serial port is not connected; cannot send.",
+                        );
+                        let _ = event_tx.send(Event::Error(message));
                     }
                 },
                 Command::SetRts(level) => {
                     if let Some(p) = port.as_mut()
                         && let Err(e) = p.write_request_to_send(level)
                     {
-                        let _ = event_tx.send(Event::Error(format!("设置 RTS 失败: {e}")));
+                        let message = LocalizedMessage::new(
+                            format!("设置 RTS 失败: {e}"),
+                            format!("Failed to set RTS: {e}"),
+                        );
+                        let _ = event_tx.send(Event::Error(message));
                     }
                 }
                 Command::SetBreak(enabled) => {
@@ -262,7 +275,11 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
                             p.clear_break()
                         };
                         if let Err(e) = result {
-                            let _ = event_tx.send(Event::Error(format!("设置 Break 失败: {e}")));
+                            let message = LocalizedMessage::new(
+                                format!("设置 Break 失败: {e}"),
+                                format!("Failed to set Break: {e}"),
+                            );
+                            let _ = event_tx.send(Event::Error(message));
                         }
                     }
                 }
@@ -302,7 +319,11 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
                         port = None;
                         last_cts = None;
                         last_cts_poll = None;
-                        let _ = event_tx.send(Event::Error(format!("读取失败: {e}")));
+                        let message = LocalizedMessage::new(
+                            format!("读取失败: {e}"),
+                            format!("Read failed: {e}"),
+                        );
+                        let _ = event_tx.send(Event::Error(message));
                         let _ = event_tx.send(Event::Disconnected);
                         break;
                     }
@@ -382,7 +403,8 @@ fn poll_loop(
                     Err(e) => {
                         // 枚举失败 ≠ 没有端口，发送明确错误，
                         // 不清空已有端口状态。
-                        let _ = event_tx.send(Event::PortEnumerationError(format!("{e}")));
+                        let message = LocalizedMessage::new(e.to_string(), e.localized("en"));
+                        let _ = event_tx.send(Event::PortEnumerationError(message));
                     }
                 }
             }

@@ -1,10 +1,14 @@
 import { MaterialTheme } from "material-theme.slint";
+import { I18n } from "i18n.slint";
 
 export component MaterialCard inherits Rectangle {
     background: MaterialTheme.surface_container_lowest;
     border-radius: 16px;
     border-width: 1px;
     border-color: MaterialTheme.outline_variant;
+
+    animate background { duration: 150ms; easing: ease-out; }
+    animate border-color { duration: 150ms; easing: ease-out; }
 }
 
 export component MaterialFilledButton {
@@ -22,6 +26,7 @@ export component MaterialFilledButton {
                 ? (touch.pressed ? MaterialTheme.error.darker(0.12) : touch.has-hover ? MaterialTheme.error.darker(0.08) : MaterialTheme.error)
                 : touch.pressed ? MaterialTheme.primary.darker(0.12)
                 : (touch.has-hover ? MaterialTheme.primary.brighter(0.06) : MaterialTheme.primary);
+        animate background { duration: 150ms; easing: ease-out; }
         Text {
             text: root.text;
             color: !root.enabled ? MaterialTheme.text_disabled : root.destructive ? MaterialTheme.on_error : MaterialTheme.on_primary;
@@ -29,6 +34,7 @@ export component MaterialFilledButton {
             font-weight: 600;
             horizontal-alignment: center;
             vertical-alignment: center;
+            animate color { duration: 150ms; easing: ease-out; }
         }
         touch := TouchArea {
             clicked => { if (root.enabled) { root.clicked(); } }
@@ -49,6 +55,7 @@ export component MaterialTonalButton {
             : touch.pressed ? MaterialTheme.on_primary_container
             : touch.has-hover ? MaterialTheme.primary_container
             : MaterialTheme.surface_container_high;
+        animate background { duration: 150ms; easing: ease-out; }
         Text {
             text: root.text;
             color: root.enabled ? MaterialTheme.on_surface : MaterialTheme.text_disabled;
@@ -56,6 +63,7 @@ export component MaterialTonalButton {
             font-weight: 600;
             horizontal-alignment: center;
             vertical-alignment: center;
+            animate color { duration: 150ms; easing: ease-out; }
         }
         touch := TouchArea {
             clicked => { if (root.enabled) { root.clicked(); } }
@@ -76,8 +84,10 @@ export component MaterialOutlinedButton {
         border-color: root.enabled ? (touch.has-hover ? MaterialTheme.primary : MaterialTheme.outline) : MaterialTheme.outline_variant;
         background: !root.enabled ? Colors.transparent
             : touch.pressed ? MaterialTheme.primary_container
-            : touch.has-hover ? MaterialTheme.primary_container.with-alpha(0.35)
-            : Colors.transparent;
+            : touch.has-hover ? MaterialTheme.primary_container.with-alpha(0.6)
+            : MaterialTheme.surface_container_low;
+        animate background { duration: 150ms; easing: ease-out; }
+        animate border-color { duration: 150ms; easing: ease-out; }
         Text {
             text: root.text;
             color: root.enabled ? MaterialTheme.on_surface : MaterialTheme.text_disabled;
@@ -85,6 +95,7 @@ export component MaterialOutlinedButton {
             font-weight: 600;
             horizontal-alignment: center;
             vertical-alignment: center;
+            animate color { duration: 150ms; easing: ease-out; }
         }
         touch := TouchArea {
             clicked => { if (root.enabled) { root.clicked(); } }
@@ -123,6 +134,8 @@ export component MaterialNavigationItem {
             ? MaterialTheme.primary_container
             : Colors.transparent;
 
+        animate background { duration: 150ms; easing: ease-out; }
+
         Text {
             width: parent.width;
             height: parent.height;
@@ -137,6 +150,7 @@ export component MaterialNavigationItem {
 
             horizontal-alignment: center;
             vertical-alignment: center;
+            animate color { duration: 150ms; easing: ease-out; }
         }
     }
 
@@ -159,9 +173,92 @@ export component MaterialNavigationItem {
 
         horizontal-alignment: center;
         vertical-alignment: center;
+        animate color { duration: 150ms; easing: ease-out; }
     }
 }
 
+
+/// 单选卡片：用于设置页的语言和主题选择。
+export component MaterialChoiceCard {
+    in property <string> title: "";
+    in property <string> subtitle: "";
+    in property <bool> selected: false;
+    in property <bool> show_preview: false;
+    in property <color> preview: #000000;
+    callback clicked();
+    height: 80px;
+    min-width: 180px;
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: 14px;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? MaterialTheme.primary : MaterialTheme.outline_variant;
+        background: root.selected
+            ? MaterialTheme.primary_container.with-alpha(0.45)
+            : MaterialTheme.surface_container_low;
+
+        animate background { duration: 150ms; easing: ease-out; }
+        animate border-color { duration: 150ms; easing: ease-out; }
+
+        HorizontalLayout {
+            width: 100%;
+            height: 100%;
+            padding: 14px;
+            spacing: 12px;
+
+            if root.show_preview : Rectangle {
+                width: 28px;
+                height: 28px;
+                border-radius: 14px;
+                background: root.preview;
+                border-width: 2px;
+                border-color: MaterialTheme.outline_variant;
+                animate background { duration: 150ms; easing: ease-out; }
+                animate border-color { duration: 150ms; easing: ease-out; }
+            }
+
+            VerticalLayout {
+                vertical-stretch: 1;
+                spacing: 3px;
+
+                Text {
+                    text: root.title;
+                    color: root.selected ? MaterialTheme.on_primary_container : MaterialTheme.text_primary;
+                    font-size: 15px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                    animate color { duration: 150ms; easing: ease-out; }
+                }
+
+                Text {
+                    text: root.subtitle;
+                    color: MaterialTheme.text_secondary;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                    vertical-alignment: top;
+                    animate color { duration: 150ms; easing: ease-out; }
+                }
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            if root.selected : Text {
+                text: "check_circle";
+                font-family: "Material Symbols Rounded";
+                color: MaterialTheme.primary;
+                font-size: 22px;
+                vertical-alignment: center;
+                animate color { duration: 150ms; easing: ease-out; }
+            }
+        }
+
+        touch := TouchArea {
+            clicked => { root.clicked(); }
+        }
+    }
+}
 
 /// 端口选项：`display` 用于列表展示，`name` 是传给后端的实际设备路径。
 export struct PortOption {
@@ -188,6 +285,9 @@ export component MaterialSelect {
             ? MaterialTheme.control_background_hover
             : touch.has-hover ? MaterialTheme.control_background_hover : MaterialTheme.control_background;
 
+        animate background { duration: 150ms; easing: ease-out; }
+        animate border-color { duration: 150ms; easing: ease-out; }
+
         // 选中值 / 占位文本：宽度由父控件决定，长文本省略显示，
         // 避免内容反过来撑大父控件尺寸。
         Text {
@@ -199,6 +299,7 @@ export component MaterialSelect {
             font-size: 14px;
             vertical-alignment: center;
             overflow: elide;
+            animate color { duration: 150ms; easing: ease-out; }
         }
 
         // 下拉箭头图标
@@ -232,6 +333,8 @@ export component MaterialSelect {
             border-radius: 12px;
             border-width: 1px;
             border-color: MaterialTheme.outline_variant;
+            animate background { duration: 150ms; easing: ease-out; }
+            animate border-color { duration: 150ms; easing: ease-out; }
 
             VerticalLayout {
                 padding: 6px;
@@ -250,6 +353,7 @@ export component MaterialSelect {
                             height: 40px;
                             border-radius: 8px;
                             background: option_touch.has-hover ? MaterialTheme.primary_container : Colors.transparent;
+                            animate background { duration: 150ms; easing: ease-out; }
 
                             Text {
                                 text: option;
@@ -260,6 +364,7 @@ export component MaterialSelect {
                                 font-size: 14px;
                                 vertical-alignment: center;
                                 overflow: elide;
+                                animate color { duration: 150ms; easing: ease-out; }
                             }
 
                             option_touch := TouchArea {
@@ -295,6 +400,8 @@ export component MaterialPortField {
         background: !root.enabled
             ? MaterialTheme.surface_container_highest
             : MaterialTheme.control_background;
+        animate background { duration: 150ms; easing: ease-out; }
+        animate border-color { duration: 150ms; easing: ease-out; }
 
         // 端口路径是可编辑输入框：既支持手填，也支持从下拉列表选。
         input := TextInput {
@@ -309,6 +416,7 @@ export component MaterialPortField {
             vertical-alignment: center;
             single-line: true;
             accepted => { root.accepted(); }
+            animate color { duration: 150ms; easing: ease-out; }
         }
 
         if root.value == "" && root.placeholder != "" : Text {
@@ -320,6 +428,7 @@ export component MaterialPortField {
             font-size: 14px;
             vertical-alignment: center;
             overflow: elide;
+            animate color { duration: 150ms; easing: ease-out; }
         }
 
         // 下拉箭头：展开自动发现的端口列表。
@@ -356,6 +465,8 @@ export component MaterialPortField {
             border-radius: 12px;
             border-width: 1px;
             border-color: MaterialTheme.outline_variant;
+            animate background { duration: 150ms; easing: ease-out; }
+            animate border-color { duration: 150ms; easing: ease-out; }
 
             VerticalLayout {
                 padding: 6px;
@@ -363,11 +474,12 @@ export component MaterialPortField {
 
                 if root.options.length == 0 : Text {
                     height: 40px;
-                    text: "未发现可用端口，可直接输入路径";
+                    text: I18n.no_ports_hint;
                     color: MaterialTheme.text_secondary;
                     font-size: 13px;
                     vertical-alignment: center;
                     horizontal-alignment: center;
+                    animate color { duration: 150ms; easing: ease-out; }
                 }
 
                 // 选项列表：超过最大高度时内部滚动，防止撑大 popup。
@@ -382,7 +494,7 @@ export component MaterialPortField {
                         for option in root.options : Rectangle {
                             height: 40px;
                             border-radius: 8px;
-                            background: option_touch.has-hover ? MaterialTheme.primary_container : Colors.transparent;
+                            animate background { duration: 150ms; easing: ease-out; }
 
                             Text {
                                 text: option.display;
@@ -393,6 +505,7 @@ export component MaterialPortField {
                                 font-size: 14px;
                                 vertical-alignment: center;
                                 overflow: elide;
+                                animate color { duration: 150ms; easing: ease-out; }
                             }
 
                             option_touch := TouchArea {
@@ -415,10 +528,13 @@ export component SectionTitle {
     height: 24px;
     Text {
         text: root.text;
+        width: 100%;
         color: MaterialTheme.text_primary;
         font-size: 16px;
         font-weight: 600;
+        horizontal-alignment: left;
         vertical-alignment: center;
+        animate color { duration: 150ms; easing: ease-out; }
     }
 }
 
@@ -431,6 +547,7 @@ export component FieldLabel {
         font-size: 12px;
         font-weight: 500;
         vertical-alignment: center;
+        animate color { duration: 150ms; easing: ease-out; }
     }
 }
 
@@ -452,6 +569,8 @@ export component MaterialCheckbox {
             border-width: 2px;
             border-color: !root.enabled ? MaterialTheme.outline_variant : root.checked ? MaterialTheme.primary : touch.has-hover ? MaterialTheme.on_surface : MaterialTheme.outline;
             background: !root.enabled ? (root.checked ? MaterialTheme.surface_container_highest : Colors.transparent) : root.checked ? MaterialTheme.primary : Colors.transparent;
+            animate background { duration: 150ms; easing: ease-out; }
+            animate border-color { duration: 150ms; easing: ease-out; }
             if root.checked : Text {
                 text: "check"; // <--- 改为 Material Symbols 的 "check" 图标
                 font-family: "Material Symbols Rounded"; // <--- 声明使用新引入的图标字体
@@ -460,6 +579,7 @@ export component MaterialCheckbox {
                 font-weight: 800;
                 horizontal-alignment: center;
                 vertical-alignment: center;
+                animate color { duration: 150ms; easing: ease-out; }
             }
         }
         Text {
@@ -467,6 +587,7 @@ export component MaterialCheckbox {
             color: !root.enabled ? MaterialTheme.text_disabled : MaterialTheme.text_primary;
             font-size: 14px;
             vertical-alignment: center;
+            animate color { duration: 150ms; easing: ease-out; }
         }
     }
     touch := TouchArea {
@@ -493,6 +614,8 @@ export component MaterialTextField {
         border-width: input.has-focus ? 2px : 1px;
         border-color: !root.enabled ? MaterialTheme.outline_variant : input.has-focus ? MaterialTheme.control_border_focus : MaterialTheme.control_border;
         background: !root.enabled ? MaterialTheme.surface_container_highest : MaterialTheme.control_background;
+        animate background { duration: 150ms; easing: ease-out; }
+        animate border-color { duration: 150ms; easing: ease-out; }
         if root.text == "" && root.placeholder != "" : Text {
             x: 12px;
             width: parent.width - 24px;
@@ -501,6 +624,7 @@ export component MaterialTextField {
             color: MaterialTheme.text_disabled;
             font-size: 14px;
             vertical-alignment: center;
+            animate color { duration: 150ms; easing: ease-out; }
         }
         input := TextInput {
             x: 12px;
@@ -515,6 +639,7 @@ export component MaterialTextField {
             vertical-alignment: center;
             single-line: true;
             accepted => { root.accepted(); }
+            animate color { duration: 150ms; easing: ease-out; }
         }
     }
 }
@@ -532,6 +657,8 @@ export component MaterialTextArea {
         border-width: input.has-focus ? 2px : 1px;
         border-color: !root.enabled ? MaterialTheme.outline_variant : input.has-focus ? MaterialTheme.control_border_focus : MaterialTheme.control_border;
         background: !root.enabled ? MaterialTheme.surface_container_highest : MaterialTheme.surface_container_low;
+        animate background { duration: 150ms; easing: ease-out; }
+        animate border-color { duration: 150ms; easing: ease-out; }
         if root.text == "" && root.placeholder != "" : Text {
             x: 12px;
             y: 12px;
@@ -540,6 +667,7 @@ export component MaterialTextArea {
             color: MaterialTheme.text_disabled;
             font-size: 14px;
             vertical-alignment: top;
+            animate color { duration: 150ms; easing: ease-out; }
         }
         Flickable {
             x: 12px;
@@ -557,6 +685,7 @@ export component MaterialTextArea {
                 font-size: 14px;
                 wrap: word-wrap;
                 single-line: false;
+                animate color { duration: 150ms; easing: ease-out; }
             }
         }
     }
@@ -575,7 +704,9 @@ export component MaterialReceiveView {
         border-radius: 12px;
         border-width: 1px;
         border-color: MaterialTheme.outline_variant;
-        background: MaterialTheme.surface_container_low;
+        background: MaterialTheme.terminal_bg;
+        animate background { duration: 150ms; easing: ease-out; }
+        animate border-color { duration: 150ms; easing: ease-out; }
 
         // ================================================================
         // 接收数据显示区域
@@ -608,15 +739,14 @@ export component MaterialReceiveView {
                 read-only: true;
                 single-line: false;
 
-                color: root.enabled
-                    ? MaterialTheme.text_primary
-                    : MaterialTheme.text_disabled;
+                color: root.enabled ? MaterialTheme.rx_text : MaterialTheme.text_disabled;
 
                 font-size: 14px;
 
                 // 长行自动换行，避免横向滚动。
                 wrap: word-wrap;
                 vertical-alignment: top;
+                animate color { duration: 150ms; easing: ease-out; }
             }
         }
 

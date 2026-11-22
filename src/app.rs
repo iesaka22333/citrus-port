@@ -8,6 +8,7 @@
 // ============================================================================
 
 use std::collections::VecDeque;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -30,6 +31,141 @@ const RX_TRIM_SLACK_BYTES: usize = 256 * 1024;
 /// RX 显示刷新的最小间隔（毫秒）。连续收包时把多次属性更新合并为一次，
 /// 避免每个 Received 事件都复制整份日志并触发文本重排。
 const RX_UI_FLUSH_MS: u64 = 33;
+
+const DEFAULT_LANG: &str = "zh";
+const DEFAULT_THEME: &str = "citrus-dark";
+const VALID_THEMES: [&str; 3] = ["citrus-dark", "citrus-light", "catppuccin-mocha"];
+
+/// Persisted UI settings. Missing or invalid values fall back to defaults.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppSettings {
+    pub lang: String,
+    pub theme_id: String,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            lang: DEFAULT_LANG.to_string(),
+            theme_id: DEFAULT_THEME.to_string(),
+        }
+    }
+}
+
+fn normalize_lang(value: &str) -> String {
+    match value.trim() {
+        "en" => "en".to_string(),
+        _ => DEFAULT_LANG.to_string(),
+    }
+}
+
+fn normalize_theme(value: &str) -> String {
+    let value = value.trim();
+    if VALID_THEMES.contains(&value) {
+        value.to_string()
+    } else {
+        DEFAULT_THEME.to_string()
+    }
+}
+
+fn parse_settings(text: &str) -> AppSettings {
+    let mut settings = AppSettings::default();
+    for raw in text.lines() {
+        let line = raw.split('#').next().unwrap_or("").trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = value.trim().trim_matches('"').trim_matches('\'');
+        match key.trim() {
+            "lang" => settings.lang = normalize_lang(value),
+            "theme-id" | "theme_id" => settings.theme_id = normalize_theme(value),
+            _ => {}
+        }
+    }
+    settings
+}
+
+fn serialize_settings(settings: &AppSettings) -> String {
+    format!(
+        "lang = \"{}\"\ntheme-id = \"{}\"\n",
+        normalize_lang(&settings.lang),
+        normalize_theme(&settings.theme_id)
+    )
+}
+
+fn settings_path() -> Option<PathBuf> {
+    let base = if cfg!(windows) {
+        std::env::var_os("APPDATA").map(PathBuf::from).or_else(|| {
+            std::env::var_os("USERPROFILE")
+                .map(|p| PathBuf::from(p).join("AppData").join("Roaming"))
+        })
+    } else {
+        std::env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".config")))
+    }?;
+    Some(base.join("citrus-port").join("config.toml"))
+}
+
+fn load_settings() -> AppSettings {
+    settings_path()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| parse_settings(&text))
+        .unwrap_or_default()
+}
+
+fn save_settings(settings: &AppSettings) {
+    let Some(path) = settings_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(path, serialize_settings(settings));
+}
+
+struct BackendText {
+    error_prefix: &'static str,
+    notice_prefix: &'static str,
+    connected: &'static str,
+    disconnected: &'static str,
+    not_connected_send: &'static str,
+    empty_log: &'static str,
+    saved_log_prefix: &'static str,
+    save_failed_prefix: &'static str,
+    backend_start_failed_prefix: &'static str,
+}
+
+fn backend_text(lang: &str) -> BackendText {
+    if lang == "en" {
+        BackendText {
+            error_prefix: "[Error] ",
+            notice_prefix: "[Notice] ",
+            connected: "Serial port connected",
+            disconnected: "Serial port disconnected",
+            not_connected_send: "Serial port is not connected; cannot send.",
+            empty_log: "Receive log is empty; nothing to save.",
+            saved_log_prefix: "Receive log saved to ",
+            save_failed_prefix: "Failed to save receive log: ",
+            backend_start_failed_prefix: "Failed to start serial backend: ",
+        }
+    } else {
+        BackendText {
+            error_prefix: "[错误] ",
+            notice_prefix: "[提示] ",
+            connected: "串口已连接",
+            disconnected: "串口已断开",
+            not_connected_send: "未连接串口，无法发送",
+            empty_log: "接收区为空，无需保存",
+            saved_log_prefix: "接收区已保存到 ",
+            save_failed_prefix: "保存接收区失败: ",
+            backend_start_failed_prefix: "串口后端启动失败: ",
+        }
+    }
+}
 
 /// 应用层维护的接收文本缓冲，带上限裁剪。
 struct RxBuffer {
@@ -225,6 +361,10 @@ pub struct App;
 
 impl App {
     pub fn run(ui: MainWindow) -> Result<(), Box<dyn std::error::Error>> {
+        let settings = load_settings();
+        ui.set_lang(settings.lang.as_str().into());
+        ui.set_theme_id(settings.theme_id.as_str().into());
+
         let mut ctx = Self::attach(&ui)?;
         ctx.start();
         ui.run()?;
@@ -234,8 +374,9 @@ impl App {
     /// 注册 UI 回调并准备后端、事件通道和刷新定时器。
     /// 真正的事件循环由 `run` 在 `attach` 之后启动，便于测试单独复用初始化。
     fn attach(ui: &MainWindow) -> Result<AppContext, Box<dyn std::error::Error>> {
+        let start_error = backend_text(ui.get_lang().as_str()).backend_start_failed_prefix;
         let (manager, event_rx) =
-            SerialManager::start().map_err(|e| format!("串口后端启动失败: {e}"))?;
+            SerialManager::start().map_err(|e| format!("{start_error}{e}"))?;
         let manager = Rc::new(manager);
 
         // 初始化端口列表
@@ -321,7 +462,8 @@ fn setup_callbacks(ui: &MainWindow, manager: Rc<SerialManager>, state: Arc<Mutex
                         manager.open(cfg);
                     }
                     Err(e) => {
-                        append_error(&ui, &state, &format!("{e}"));
+                        let msg = e.localized(ui.get_lang().as_str());
+                        append_error(&ui, &state, &msg);
                         ui.set_is_connected(false);
                     }
                 }
@@ -341,7 +483,8 @@ fn setup_callbacks(ui: &MainWindow, manager: Rc<SerialManager>, state: Arc<Mutex
                 return;
             };
             if !ui.get_is_connected() {
-                append_error(&ui, &state, "未连接串口，无法发送");
+                let text = backend_text(ui.get_lang().as_str());
+                append_error(&ui, &state, text.not_connected_send);
                 return;
             }
 
@@ -352,7 +495,8 @@ fn setup_callbacks(ui: &MainWindow, manager: Rc<SerialManager>, state: Arc<Mutex
             let data = match request.encode() {
                 Ok(data) => data,
                 Err(e) => {
-                    append_error(&ui, &state, &format!("{e}"));
+                    let msg = e.localized(ui.get_lang().as_str());
+                    append_error(&ui, &state, &msg);
                     return;
                 }
             };
@@ -404,15 +548,20 @@ fn setup_callbacks(ui: &MainWindow, manager: Rc<SerialManager>, state: Arc<Mutex
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
-            let text = state.lock().unwrap().rx.text.clone();
-            if text.is_empty() {
-                append_notice(&ui, &state, "接收区为空，无需保存");
+            let log_text = state.lock().unwrap().rx.text.clone();
+            let text = backend_text(ui.get_lang().as_str());
+            if log_text.is_empty() {
+                append_notice(&ui, &state, text.empty_log);
                 return;
             }
             let path = rx_save_path();
-            match std::fs::write(&path, text.as_bytes()) {
-                Ok(()) => append_notice(&ui, &state, &format!("接收区已保存到 {}", path.display())),
-                Err(e) => append_error(&ui, &state, &format!("保存接收区失败: {e}")),
+            match std::fs::write(&path, log_text.as_bytes()) {
+                Ok(()) => append_notice(
+                    &ui,
+                    &state,
+                    &format!("{}{}", text.saved_log_prefix, path.display()),
+                ),
+                Err(e) => append_error(&ui, &state, &format!("{}{e}", text.save_failed_prefix)),
             }
         }
     });
@@ -431,6 +580,25 @@ fn setup_callbacks(ui: &MainWindow, manager: Rc<SerialManager>, state: Arc<Mutex
         let manager = manager.clone();
         move |enabled| {
             manager.set_break(enabled);
+        }
+    });
+
+    // ------------------------------------------------------------------
+    // 设置持久化
+    // ------------------------------------------------------------------
+    ui.on_language_changed({
+        move |lang| {
+            let mut settings = load_settings();
+            settings.lang = normalize_lang(lang.as_str());
+            save_settings(&settings);
+        }
+    });
+
+    ui.on_theme_changed({
+        move |theme_id| {
+            let mut settings = load_settings();
+            settings.theme_id = normalize_theme(theme_id.as_str());
+            save_settings(&settings);
         }
     });
 }
@@ -502,6 +670,8 @@ fn handle_event(ui: &MainWindow, event: Event, state: &Mutex<AppState>) {
         Event::Connected => {
             ui.set_is_connected(true);
             ui.set_is_connecting(false);
+            let msg = backend_text(ui.get_lang().as_str()).connected;
+            append_notice(ui, state, msg);
         }
         Event::Disconnected => {
             let mut st = state.lock().unwrap();
@@ -516,6 +686,8 @@ fn handle_event(ui: &MainWindow, event: Event, state: &Mutex<AppState>) {
             ui.set_break_enabled(false);
             // 把断开前最后一批接收文本立即刷出，避免停在旧画面。
             flush_rx_to_ui(ui, state);
+            let msg = backend_text(ui.get_lang().as_str()).disconnected;
+            append_notice(ui, state, msg);
         }
         Event::Received(bytes) => handle_received(ui, &bytes, state),
         Event::Sent(bytes) => {
@@ -526,10 +698,12 @@ fn handle_event(ui: &MainWindow, event: Event, state: &Mutex<AppState>) {
         }
         Event::Error(msg) => {
             ui.set_is_connecting(false);
-            append_error(ui, state, &msg);
+            let lang = ui.get_lang();
+            append_error(ui, state, msg.text(lang.as_str()));
         }
         Event::PortEnumerationError(msg) => {
-            append_error(ui, state, &msg);
+            let lang = ui.get_lang();
+            append_error(ui, state, msg.text(lang.as_str()));
         }
         Event::PortsChanged(ports) => {
             apply_ports(ui, &ports);
@@ -569,11 +743,12 @@ fn flush_rx_to_ui(ui: &MainWindow, state: &Mutex<AppState>) {
     ui.set_tx_byte_count(st.tx_bytes as i32);
 }
 
-/// 以 `[提示] ...` 形式将提示追加到接收区，并同步 UI 显示。
+/// 以当前语言的提示前缀将消息追加到接收区，并同步 UI 显示。
 fn append_notice(ui: &MainWindow, state: &Mutex<AppState>, msg: &str) {
+    let prefix = backend_text(ui.get_lang().as_str()).notice_prefix;
     {
         let mut st = state.lock().unwrap();
-        st.rx.append_line(&format!("[提示] {msg}"));
+        st.rx.append_line(&format!("{prefix}{msg}"));
         st.rx_dirty = true;
     }
     flush_rx_to_ui(ui, state);
@@ -594,11 +769,12 @@ fn rx_save_path() -> std::path::PathBuf {
     dir.join(filename)
 }
 
-/// 以 `[错误] ...` 形式将错误追加到接收区，并同步 UI 显示。
+/// 以当前语言的错误前缀将错误追加到接收区，并同步 UI 显示。
 fn append_error(ui: &MainWindow, state: &Mutex<AppState>, msg: &str) {
+    let prefix = backend_text(ui.get_lang().as_str()).error_prefix;
     {
         let mut st = state.lock().unwrap();
-        st.rx.append_line(&format!("[错误] {msg}"));
+        st.rx.append_line(&format!("{prefix}{msg}"));
         st.rx_dirty = true;
     }
     flush_rx_to_ui(ui, state);

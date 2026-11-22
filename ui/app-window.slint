@@ -1,4 +1,5 @@
 import { MaterialTheme } from "material-theme.slint";
+import { I18n } from "i18n.slint";
 import { ScrollView } from "std-widgets.slint";
 import "./MaterialSymbolsRounded-VariableFont_FILL,GRAD,opsz,wght.ttf";
 
@@ -8,6 +9,7 @@ import {
     MaterialTonalButton,
     MaterialOutlinedButton,
     MaterialNavigationItem,
+    MaterialChoiceCard,
     MaterialSelect,
     MaterialPortField,
     PortOption,
@@ -29,6 +31,7 @@ export component MainWindow inherits Window {
     min-height: 600px;
 
     background: MaterialTheme.background;
+    animate background { duration: 150ms; easing: ease-out; }
 
 
     // ========================================================================
@@ -38,6 +41,8 @@ export component MainWindow inherits Window {
     in-out property <int> active_tab: 0;
     in-out property <bool> is_connected: false;
     in-out property <bool> is_connecting: false;
+    in-out property <string> lang: "zh";
+    in-out property <string> theme_id: "citrus-dark";
 
     in property <[PortOption]> available_ports: [];
     in-out property <string> current_port: "";
@@ -48,7 +53,7 @@ export component MainWindow inherits Window {
     in-out property <string> current_stop_bits: "1";
     in-out property <string> current_flow_control: "None";
 
-    in-out property <string> rx_content: "CitrusPort等待打开串口...";
+    in-out property <string> rx_content: I18n.welcome;
     in-out property <string> tx_content: "";
     in-out property <int> rx_byte_count: 0;
     in-out property <int> tx_byte_count: 0;
@@ -64,6 +69,19 @@ export component MainWindow inherits Window {
 
     in-out property <string> current_newline: "\\r\\n";
 
+    init => {
+        I18n.lang = root.lang;
+        MaterialTheme.theme-id = root.theme_id;
+    }
+
+    changed lang => {
+        I18n.lang = root.lang;
+    }
+
+    changed theme_id => {
+        MaterialTheme.theme-id = root.theme_id;
+    }
+
 
     // ========================================================================
     // Callbacks
@@ -75,6 +93,8 @@ export component MainWindow inherits Window {
     callback save_rx_clicked();
     callback set_rts_clicked(bool);
     callback set_break_clicked(bool);
+    callback language_changed(string);
+    callback theme_changed(string);
 
 
     // ========================================================================
@@ -95,6 +115,7 @@ export component MainWindow inherits Window {
 
             background: MaterialTheme.surface_container;
             border-radius: 20px;
+            animate background { duration: 150ms; easing: ease-out; }
 
 
             VerticalLayout {
@@ -121,6 +142,7 @@ export component MainWindow inherits Window {
 
                         border-radius: 16px;
                         background: MaterialTheme.primary_container;
+                        animate background { duration: 150ms; easing: ease-out; }
 
 
                         Text {
@@ -135,6 +157,7 @@ export component MainWindow inherits Window {
 
                             horizontal-alignment: center;
                             vertical-alignment: center;
+                            animate color { duration: 150ms; easing: ease-out; }
                         }
                     }
                 }
@@ -154,7 +177,7 @@ export component MainWindow inherits Window {
                         height: 64px;
 
                         icon: "usb";
-                        label: "串口";
+                        label: I18n.nav_serial;
 
                         selected: root.active_tab == 0;
 
@@ -169,7 +192,7 @@ export component MainWindow inherits Window {
                         height: 64px;
 
                         icon: "monitoring";
-                        label: "波形";
+                        label: I18n.nav_waveform;
 
                         selected: root.active_tab == 1;
 
@@ -184,7 +207,7 @@ export component MainWindow inherits Window {
                         height: 64px;
 
                         icon: "swap_horiz";
-                        label: "协议";
+                        label: I18n.nav_protocol;
 
                         selected: root.active_tab == 2;
 
@@ -196,11 +219,26 @@ export component MainWindow inherits Window {
 
 
                 // ============================================================
-                // Bottom Spacer
+                // Bottom Spacer + Settings
                 // ============================================================
 
                 Rectangle {
                     vertical-stretch: 1;
+                }
+
+
+                MaterialNavigationItem {
+                    width: 80px;
+                    height: 64px;
+
+                    icon: "settings";
+                    label: I18n.nav_settings;
+
+                    selected: root.active_tab == 3;
+
+                    clicked => {
+                        root.active_tab = 3;
+                    }
                 }
             }
         }
@@ -251,22 +289,23 @@ export component MainWindow inherits Window {
 
                         Text {
                             text: root.is_connecting
-                                ? "正在打开串口…"
+                                ? I18n.status_connecting
                                 : root.is_connected
-                                    ? "串口已连接"
-                                    : "未连接设备";
+                                    ? I18n.status_connected
+                                    : I18n.status_disconnected;
 
                             height: 20px;
 
                             color: root.is_connecting
                                 ? MaterialTheme.primary
                                 : root.is_connected
-                                    ? MaterialTheme.primary
+                                    ? MaterialTheme.success
                                     : MaterialTheme.text_secondary;
 
                             font-size: 12px;
 
                             vertical-alignment: center;
+                            animate color { duration: 150ms; easing: ease-out; }
                         }
                     }
 
@@ -297,23 +336,25 @@ export component MainWindow inherits Window {
                             background: root.is_connecting
                                 ? MaterialTheme.primary_container
                                 : root.is_connected
-                                    ? MaterialTheme.primary
+                                    ? MaterialTheme.success
                                     : MaterialTheme.outline;
+                            animate background { duration: 150ms; easing: ease-out; }
                         }
                     }
 
 
                     Text {
                         text: root.is_connecting
-                            ? "Connecting"
+                            ? I18n.indicator_connecting
                             : root.is_connected
-                                ? "Connected"
-                                : "Disconnected";
+                                ? I18n.indicator_connected
+                                : I18n.indicator_disconnected;
 
                         color: MaterialTheme.text_secondary;
                         font-size: 12px;
 
                         vertical-alignment: center;
+                        animate color { duration: 150ms; easing: ease-out; }
                     }
                 }
             }
@@ -346,7 +387,7 @@ export component MainWindow inherits Window {
                         // -----------------------------------------------------
 
                         SectionTitle {
-                            text: "串口设置";
+                            text: I18n.serial_settings;
                             height: 28px;
                         }
 
@@ -376,21 +417,21 @@ export component MainWindow inherits Window {
                                     spacing: 6px;
 
                                     FieldLabel {
-                                         text: "端口" ; 
+                                         text: I18n.port ; 
                                    } 
                                     MaterialPortField {
                                         width: 100%;
                                         horizontal-stretch: 1;
                                         options: root.available_ports;
                                         value <=> root.current_port;
-                                        placeholder: "选择或输入端口路径";
+                                        placeholder: I18n.placeholder_port;
                                         enabled: !root.is_connected && !root.is_connecting;
                                         accepted => { root.toggle_port_clicked(); }
                                     }
 
 
                                     FieldLabel {
-                                        text: "波特率";
+                                        text: I18n.baud_rate;
                                     }
 
 
@@ -414,7 +455,7 @@ export component MainWindow inherits Window {
                                             "3000000"
                                         ];
 
-                                        placeholder: "选择波特率";
+                                        placeholder: I18n.placeholder_baud;
                                     }
                                 }
 
@@ -428,7 +469,7 @@ export component MainWindow inherits Window {
 
 
                                     FieldLabel {
-                                        text: "数据位";
+                                        text: I18n.data_bits;
                                     }
 
 
@@ -444,7 +485,7 @@ export component MainWindow inherits Window {
                                             "5"
                                         ];
 
-                                        placeholder: "选择数据位";
+                                        placeholder: I18n.placeholder_data_bits;
                                     }
                                 }
 
@@ -458,7 +499,7 @@ export component MainWindow inherits Window {
 
 
                                     FieldLabel {
-                                        text: "校验位";
+                                        text: I18n.parity;
                                     }
 
 
@@ -475,7 +516,7 @@ export component MainWindow inherits Window {
                                             "Space"
                                         ];
 
-                                        placeholder: "选择校验位";
+                                        placeholder: I18n.placeholder_parity;
                                     }
                                 }
 
@@ -489,7 +530,7 @@ export component MainWindow inherits Window {
 
 
                                     FieldLabel {
-                                        text: "停止位";
+                                        text: I18n.stop_bits;
                                     }
 
 
@@ -504,7 +545,7 @@ export component MainWindow inherits Window {
                                             "2"
                                         ];
 
-                                        placeholder: "选择停止位";
+                                        placeholder: I18n.placeholder_stop_bits;
                                     }
                                 }
 
@@ -518,7 +559,7 @@ export component MainWindow inherits Window {
 
 
                                     FieldLabel {
-                                        text: "数据流控";
+                                        text: I18n.flow_control;
                                     }
 
 
@@ -533,7 +574,7 @@ export component MainWindow inherits Window {
                                             "Hardware (RTS/CTS)"
                                         ];
 
-                                        placeholder: "选择流控";
+                                        placeholder: I18n.placeholder_flow;
                                     }
                                 }
 
@@ -547,7 +588,7 @@ export component MainWindow inherits Window {
 
 
                                     FieldLabel {
-                                        text: "流控信号";
+                                        text: I18n.flow_signals;
                                     }
 
 
@@ -557,14 +598,14 @@ export component MainWindow inherits Window {
 
                                         // CTS 是输入信号，由后端周期读取，仅作状态显示。
                                         MaterialCheckbox {
-                                            text: "CTS";
+                                            text: I18n.cts;
                                             checked <=> root.cts_enabled;
                                             enabled: false;
                                         }
 
 
                                         MaterialCheckbox {
-                                            text: "RTS";
+                                            text: I18n.rts;
                                             checked <=> root.rts_enabled;
                                             enabled: root.is_connected;
                                             toggled => {
@@ -574,7 +615,7 @@ export component MainWindow inherits Window {
 
 
                                         MaterialCheckbox {
-                                            text: "Break";
+                                            text: I18n.break_label;
                                             checked <=> root.break_enabled;
                                             enabled: root.is_connected;
                                             toggled => {
@@ -616,10 +657,10 @@ export component MainWindow inherits Window {
                                 height: 48px;
 
                                 text: root.is_connecting
-                                    ? "正在打开…"
+                                    ? I18n.opening
                                     : root.is_connected
-                                        ? "关闭串口"
-                                        : "打开串口";
+                                        ? I18n.close_port
+                                        : I18n.open_port;
 
                                 enabled: !root.is_connecting;
 
@@ -647,7 +688,7 @@ export component MainWindow inherits Window {
 
 
                         SectionTitle {
-                            text: "接收数据";
+                            text: I18n.receive_data;
                         }
 
 
@@ -661,19 +702,19 @@ export component MainWindow inherits Window {
 
 
                             MaterialCheckbox {
-                                text: "HEX显示";
+                                text: I18n.hex_display;
                                 checked <=> root.hex_display;
                             }
 
 
                             MaterialCheckbox {
-                                text: "时间戳";
+                                text: I18n.timestamp;
                                 checked <=> root.show_timestamp;
                             }
 
 
                             MaterialCheckbox {
-                                text: "自动滚屏";
+                                text: I18n.auto_scroll;
                                 checked <=> root.auto_scroll;
                             }
 
@@ -689,7 +730,7 @@ export component MainWindow inherits Window {
 
 
                             FieldLabel {
-                                text: "编码:";
+                                text: I18n.encoding_label;
                                 height: 32px;
                             }
 
@@ -706,7 +747,7 @@ export component MainWindow inherits Window {
                                     "ASCII"
                                 ];
 
-                                placeholder: "编码";
+                                placeholder: I18n.placeholder_encoding;
                             }
 
 
@@ -716,7 +757,7 @@ export component MainWindow inherits Window {
 
 
                             Text {
-                                text: "RX " + root.rx_byte_count + " B / TX " + root.tx_byte_count + " B";
+                                text: I18n.rx_short + " " + root.rx_byte_count + " B / " + I18n.tx_short + " " + root.tx_byte_count + " B";
 
                                 color: MaterialTheme.text_secondary;
                                 font-size: 12px;
@@ -765,14 +806,14 @@ export component MainWindow inherits Window {
 
 
                         SectionTitle {
-                            text: "操作";
+                            text: I18n.actions;
                         }
 
 
                         MaterialTonalButton {
                             width: 100%;
 
-                            text: "清空接收区";
+                            text: I18n.clear_log;
 
                             clicked => {
                                 root.clear_rx_clicked();
@@ -783,7 +824,7 @@ export component MainWindow inherits Window {
                         MaterialOutlinedButton {
                             width: 100%;
 
-                            text: "保存接收区";
+                            text: I18n.save_log;
 
                             clicked => {
                                 root.save_rx_clicked();
@@ -807,7 +848,7 @@ export component MainWindow inherits Window {
 
 
                         SectionTitle {
-                            text: "数据发送";
+                            text: I18n.transmit;
                         }
 
 
@@ -821,7 +862,7 @@ export component MainWindow inherits Window {
 
 
                             MaterialCheckbox {
-                                text: "HEX发送";
+                                text: I18n.hex_send;
                                 checked <=> root.hex_send;
                             }
 
@@ -842,7 +883,7 @@ export component MainWindow inherits Window {
 
 
                             Text {
-                                text: "换行";
+                                text: I18n.line_ending;
 
                                 color: MaterialTheme.text_secondary;
                                 font-size: 12px;
@@ -864,7 +905,7 @@ export component MainWindow inherits Window {
                                     "NONE"
                                 ];
 
-                                placeholder: "自定义";
+                                placeholder: I18n.placeholder_newline;
                             }
                         }
 
@@ -882,7 +923,7 @@ export component MainWindow inherits Window {
                                 horizontal-stretch: 1;
 
                                 text <=> root.tx_content;
-                                placeholder: "输入要发送的数据...";
+                                placeholder: I18n.placeholder_send;
 
                                 accepted => {
                                     root.send_clicked();
@@ -894,7 +935,7 @@ export component MainWindow inherits Window {
                                 width: 90px;
                                 height: 48px;
 
-                                text: "发送";
+                                text: I18n.send;
                                 enabled: root.is_connected;
 
                                 clicked => {
@@ -912,7 +953,7 @@ export component MainWindow inherits Window {
         // Waveform / Protocol
         // ====================================================================
 
-        if root.active_tab != 0 : MaterialCard {
+        if root.active_tab == 1 || root.active_tab == 2 : MaterialCard {
             horizontal-stretch: 1;
             vertical-stretch: 1;
 
@@ -925,8 +966,8 @@ export component MainWindow inherits Window {
 
                 Text {
                     text: root.active_tab == 1
-                        ? "波形分析"
-                        : "协议解析";
+                        ? I18n.waveform_analysis
+                        : I18n.protocol_analysis;
 
                     color: MaterialTheme.text_primary;
                     font-size: 22px;
@@ -935,11 +976,12 @@ export component MainWindow inherits Window {
                     width: 100%;
 
                     horizontal-alignment: center;
+                    animate color { duration: 150ms; easing: ease-out; }
                 }
 
 
                 Text {
-                    text: "该功能正在开发中";
+                    text: I18n.feature_in_development;
 
                     color: MaterialTheme.text_secondary;
                     font-size: 14px;
@@ -947,7 +989,176 @@ export component MainWindow inherits Window {
                     width: 100%;
 
                     horizontal-alignment: center;
+                    animate color { duration: 150ms; easing: ease-out; }
                 }
+            }
+        }
+
+
+        // ====================================================================
+        // Settings
+        // ====================================================================
+
+        if root.active_tab == 3 : VerticalLayout {
+            horizontal-stretch: 1;
+            vertical-stretch: 1;
+            spacing: 16px;
+
+
+            // ----------------------------------------------------------------
+            // Settings Header
+            // ----------------------------------------------------------------
+
+            Rectangle {
+                height: 56px;
+                background: Colors.transparent;
+
+                VerticalLayout {
+                    spacing: 0px;
+
+                    Text {
+                        text: I18n.settings_title;
+                        height: 30px;
+                        color: MaterialTheme.text_primary;
+                        font-size: 24px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        animate color { duration: 150ms; easing: ease-out; }
+                    }
+
+                    Text {
+                        text: I18n.settings_subtitle;
+                        height: 20px;
+                        color: MaterialTheme.text_secondary;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        animate color { duration: 150ms; easing: ease-out; }
+                    }
+                }
+            }
+
+
+            // ----------------------------------------------------------------
+            // Language
+            // ----------------------------------------------------------------
+
+            MaterialCard {
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 12px;
+
+                    SectionTitle {
+                        text: I18n.language_title;
+                        height: 28px;
+                    }
+
+                    Text {
+                        text: I18n.language_hint;
+                        color: MaterialTheme.text_secondary;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                        animate color { duration: 150ms; easing: ease-out; }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12px;
+
+                        MaterialChoiceCard {
+                            horizontal-stretch: 1;
+                            title: I18n.language_zh;
+                            subtitle: I18n.language_zh_desc;
+                            selected: root.lang == "zh";
+                            clicked => {
+                                root.lang = "zh";
+                                root.language_changed("zh");
+                            }
+                        }
+
+                        MaterialChoiceCard {
+                            horizontal-stretch: 1;
+                            title: I18n.language_en;
+                            subtitle: I18n.language_en_desc;
+                            selected: root.lang == "en";
+                            clicked => {
+                                root.lang = "en";
+                                root.language_changed("en");
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            // ----------------------------------------------------------------
+            // Theme
+            // ----------------------------------------------------------------
+
+            MaterialCard {
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 12px;
+
+                    SectionTitle {
+                        text: I18n.appearance_title;
+                        height: 28px;
+                    }
+
+                    Text {
+                        text: I18n.appearance_hint;
+                        color: MaterialTheme.text_secondary;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                        animate color { duration: 150ms; easing: ease-out; }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12px;
+
+                        MaterialChoiceCard {
+                            horizontal-stretch: 1;
+                            title: I18n.theme_citrus_dark;
+                            subtitle: I18n.theme_citrus_dark_desc;
+                            show_preview: true;
+                            preview: MaterialTheme.palette_preview_citrus_dark;
+                            selected: root.theme_id == "citrus-dark";
+                            clicked => {
+                                root.theme_id = "citrus-dark";
+                                root.theme_changed("citrus-dark");
+                            }
+                        }
+
+                        MaterialChoiceCard {
+                            horizontal-stretch: 1;
+                            title: I18n.theme_citrus_light;
+                            subtitle: I18n.theme_citrus_light_desc;
+                            show_preview: true;
+                            preview: MaterialTheme.palette_preview_citrus_light;
+                            selected: root.theme_id == "citrus-light";
+                            clicked => {
+                                root.theme_id = "citrus-light";
+                                root.theme_changed("citrus-light");
+                            }
+                        }
+
+                        MaterialChoiceCard {
+                            horizontal-stretch: 1;
+                            title: I18n.theme_catppuccin_mocha;
+                            subtitle: I18n.theme_catppuccin_mocha_desc;
+                            show_preview: true;
+                            preview: MaterialTheme.palette_preview_catppuccin_mocha;
+                            selected: root.theme_id == "catppuccin-mocha";
+                            clicked => {
+                                root.theme_id = "catppuccin-mocha";
+                                root.theme_changed("catppuccin-mocha");
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            Rectangle {
+                vertical-stretch: 1;
             }
         }
     }

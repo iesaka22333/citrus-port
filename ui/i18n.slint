@@ -1,0 +1,113 @@
+// ============================================================================
+// CitrusPort 全局双语词典
+//
+// `lang` 只接受 "zh" 或 "en"；所有界面文案都从这里读取，切换语言时
+// 由 Slint 绑定系统在同一帧内完成更新。
+// ============================================================================
+
+export global I18n {
+    in-out property <string> lang: "zh";
+    out property <bool> is_zh: lang != "en";
+
+    // ------------------------------------------------------------------------
+    // Navigation and status
+    // ------------------------------------------------------------------------
+    out property <string> nav_serial: is_zh ? "串口" : "Serial";
+    out property <string> nav_waveform: is_zh ? "波形" : "Waveform";
+    out property <string> nav_protocol: is_zh ? "协议" : "Protocol";
+    out property <string> nav_settings: is_zh ? "设置" : "Settings";
+
+    out property <string> status_connecting: is_zh ? "正在打开串口…" : "Opening serial port…";
+    out property <string> status_connected: is_zh ? "串口已连接" : "Serial port connected";
+    out property <string> status_disconnected: is_zh ? "未连接设备" : "No device connected";
+    out property <string> indicator_connecting: is_zh ? "连接中" : "Connecting";
+    out property <string> indicator_connected: is_zh ? "已连接" : "Connected";
+    out property <string> indicator_disconnected: is_zh ? "未连接" : "Disconnected";
+    out property <string> welcome: is_zh ? "CitrusPort 等待打开串口…" : "CitrusPort is waiting for a serial port…";
+
+    // ------------------------------------------------------------------------
+    // Serial settings
+    // ------------------------------------------------------------------------
+    out property <string> serial_settings: is_zh ? "串口设置" : "Serial settings";
+    out property <string> port: is_zh ? "端口" : "Port";
+    out property <string> baud_rate: is_zh ? "波特率" : "Baud rate";
+    out property <string> data_bits: is_zh ? "数据位" : "Data bits";
+    out property <string> parity: is_zh ? "校验位" : "Parity";
+    out property <string> stop_bits: is_zh ? "停止位" : "Stop bits";
+    out property <string> flow_control: is_zh ? "数据流控" : "Flow control";
+    out property <string> flow_signals: is_zh ? "流控信号" : "Flow signals";
+    out property <string> encoding_label: is_zh ? "编码:" : "Encoding:";
+
+    out property <string> placeholder_port: is_zh ? "选择或输入端口路径" : "Select or type a port path";
+    out property <string> placeholder_baud: is_zh ? "选择波特率" : "Select baud rate";
+    out property <string> placeholder_data_bits: is_zh ? "选择数据位" : "Select data bits";
+    out property <string> placeholder_parity: is_zh ? "选择校验位" : "Select parity";
+    out property <string> placeholder_stop_bits: is_zh ? "选择停止位" : "Select stop bits";
+    out property <string> placeholder_flow: is_zh ? "选择流控" : "Select flow control";
+    out property <string> placeholder_encoding: is_zh ? "编码" : "Encoding";
+    out property <string> placeholder_newline: is_zh ? "自定义" : "Custom";
+    out property <string> placeholder_send: is_zh ? "输入要发送的数据..." : "Enter data to send...";
+    out property <string> no_ports_hint: is_zh ? "未发现可用端口，可直接输入路径" : "No ports found; type a path manually";
+
+    out property <string> opening: is_zh ? "正在打开…" : "Opening…";
+    out property <string> open_port: is_zh ? "打开串口" : "Open port";
+    out property <string> close_port: is_zh ? "关闭串口" : "Close port";
+
+    out property <string> cts: "CTS";
+    out property <string> rts: "RTS";
+    out property <string> break_label: "Break";
+
+    // ------------------------------------------------------------------------
+    // Receive and transmit
+    // ------------------------------------------------------------------------
+    out property <string> receive_data: is_zh ? "接收数据" : "Receive";
+    out property <string> actions: is_zh ? "操作" : "Actions";
+    out property <string> transmit: is_zh ? "数据发送" : "Transmit";
+    out property <string> hex_display: is_zh ? "HEX显示" : "HEX display";
+    out property <string> timestamp: is_zh ? "时间戳" : "Timestamp";
+    out property <string> auto_scroll: is_zh ? "自动滚屏" : "Auto-scroll";
+    out property <string> hex_send: is_zh ? "HEX发送" : "HEX send";
+    out property <string> line_ending: is_zh ? "换行" : "Line ending";
+    out property <string> clear_log: is_zh ? "清空接收区" : "Clear log";
+    out property <string> save_log: is_zh ? "保存接收区" : "Save log";
+    out property <string> send: is_zh ? "发送" : "Send";
+    out property <string> rx_short: "RX";
+    out property <string> tx_short: "TX";
+
+    // ------------------------------------------------------------------------
+    // Placeholder pages
+    // ------------------------------------------------------------------------
+    out property <string> waveform_analysis: is_zh ? "波形分析" : "Waveform analysis";
+    out property <string> protocol_analysis: is_zh ? "协议解析" : "Protocol analysis";
+    out property <string> feature_in_development: is_zh ? "该功能正在开发中" : "This feature is under development";
+
+    // ------------------------------------------------------------------------
+    // Settings
+    // ------------------------------------------------------------------------
+    out property <string> settings_title: is_zh ? "设置" : "Settings";
+    out property <string> settings_subtitle: is_zh ? "界面语言与外观" : "Language and appearance";
+
+    out property <string> language_title: is_zh ? "界面语言" : "Language";
+    out property <string> language_hint: is_zh
+        ? "切换后立即生效，串口连接与收发缓冲区保持不变。"
+        : "Changes apply immediately without interrupting the connection or log.";
+    out property <string> language_zh: "简体中文";
+    out property <string> language_zh_desc: is_zh ? "简体中文 (zh)" : "Simplified Chinese (zh)";
+    out property <string> language_en: "English";
+    out property <string> language_en_desc: is_zh ? "英语 (en)" : "English (en)";
+
+    out property <string> appearance_title: is_zh ? "外观主题" : "Appearance";
+    out property <string> appearance_hint: is_zh ? "选择一套 Material 3 配色。" : "Choose a Material 3 palette.";
+    out property <string> theme_citrus_dark: is_zh ? "橘子暖橙 · 深色" : "Citrus Warm Orange · Dark";
+    out property <string> theme_citrus_dark_desc: is_zh
+        ? "暖炭黑基底与杏橙主色"
+        : "Warm charcoal base with apricot orange";
+    out property <string> theme_citrus_light: is_zh ? "橘子暖橙 · 浅色" : "Citrus Warm Orange · Light";
+    out property <string> theme_citrus_light_desc: is_zh
+        ? "暖纸白基底与饱满橘橙"
+        : "Warm paper base with rich orange";
+    out property <string> theme_catppuccin_mocha: is_zh ? "Catppuccin Mocha 暗色" : "Catppuccin Mocha";
+    out property <string> theme_catppuccin_mocha_desc: is_zh
+        ? "Mocha 暗色与 Peach / Teal 强调色"
+        : "Mocha dark with peach and teal accents";
+}

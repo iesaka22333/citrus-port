@@ -92,6 +92,57 @@ fn rx_buffer_trims_in_amortized_chunks() {
     assert_eq!(buf.text.len(), after_trim + 1);
 }
 
+#[test]
+fn settings_default_to_chinese_and_citrus_dark() {
+    let settings = AppSettings::default();
+    assert_eq!(settings.lang, "zh");
+    assert_eq!(settings.theme_id, "citrus-dark");
+}
+
+#[test]
+fn settings_serialization_round_trip() {
+    let settings = AppSettings {
+        lang: "en".to_string(),
+        theme_id: "catppuccin-mocha".to_string(),
+    };
+    let text = serialize_settings(&settings);
+    assert!(text.contains("lang = \"en\""));
+    assert!(text.contains("theme-id = \"catppuccin-mocha\""));
+    assert_eq!(parse_settings(&text), settings);
+}
+
+#[test]
+fn invalid_settings_fall_back_to_defaults() {
+    let settings = parse_settings("lang = \"fr\"\ntheme-id = \"unknown\"\n");
+    assert_eq!(settings.lang, "zh");
+    assert_eq!(settings.theme_id, "citrus-dark");
+}
+
+#[test]
+fn backend_text_matches_selected_language() {
+    let zh = backend_text("zh");
+    assert!(zh.connected.contains("串口"));
+    assert!(zh.not_connected_send.contains("未连接"));
+    assert_eq!(zh.error_prefix, "[错误] ");
+
+    let en = backend_text("en");
+    assert!(en.connected.contains("Serial port"));
+    assert!(en.not_connected_send.contains("not connected"));
+    assert_eq!(en.error_prefix, "[Error] ");
+}
+
+#[test]
+fn serial_errors_localize_to_selected_language() {
+    let error = SerialError::InvalidHex("zz".to_string());
+    assert!(error.localized("zh").contains("HEX 格式错误"));
+    assert!(error.localized("en").starts_with("Invalid HEX"));
+
+    assert_eq!(
+        SerialError::EmptyPort.localized("en"),
+        "No serial port selected"
+    );
+}
+
 fn print_duration_stats(label: &str, mut samples: Vec<Duration>, bytes: usize) {
     assert!(!samples.is_empty());
     samples.sort();

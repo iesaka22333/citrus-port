@@ -33,6 +33,7 @@ It combines a compact Material-style UI with a threaded serial backend: port dis
 | **Text and bytes** | UTF-8, GBK, ASCII, HEX send, optional line endings, exact byte control. |
 | **Usable logs** | Timestamps, selectable text, `Ctrl+C`, auto-scroll, clear, and save to a file. |
 | **Real control lines** | CTS state display, RTS and Break operations through `serialport`. |
+| **Bilingual and themed** | Live Chinese/English switch plus three Material 3 palettes, persisted across launches. |
 | **Regression ready** | In-process PTY tests on Unix, COM-pair tests on Windows, shared transfer scenarios. |
 
 ---
@@ -49,8 +50,10 @@ It combines a compact Material-style UI with a threaded serial backend: port dis
 | 📈 | **Counters** | Raw RX bytes and successfully written TX bytes, shown in the toolbar. |
 | 🎛️ | **Control lines** | CTS is polled and displayed; RTS and Break are wired to the serial port. |
 | 🧹 | **Log actions** | Clear the view or save to `citrusport-rx-<timestamp>.log` in your home directory. |
+| 🌐 | **Language and theme** | Switch Chinese/English and Citrus Dark, Citrus Light, or Catppuccin Mocha from Settings without dropping the connection. |
+| 💾 | **Remembered settings** | `lang` and `theme-id` persist in `citrus-port/config.toml`; invalid values fall back silently. |
 | ⚠️ | **Failure handling** | Read/write errors are logged, the port is closed, and unconfirmed TX entries are discarded. |
-| 🧪 | **Testing** | 15 regular tests on Linux, including PTY byte-level round trips and reconnect cycles. |
+| 🧪 | **Testing** | 20 regular tests on Linux, including PTY byte-level round trips, reconnect cycles, and settings persistence. |
 
 ---
 
@@ -171,7 +174,7 @@ The report is written to the repository root by default and contains platform, t
 
 | Suite | Command | Notes |
 | :-- | :-- | :-- |
-| Regular | `cargo test --locked --offline` | 15 tests on x86_64 Linux (11 library + 4 PTY). |
+| Regular | `cargo test --locked --offline` | 20 tests on x86_64 Linux (16 library + 4 PTY). |
 | Unix PTY | `cargo test --locked --offline --test pty_regression` | In-process PTY pair; no `socat` required. |
 | Windows COM | `cargo test --locked --offline --test com_regression -- --ignored --nocapture` | Requires `CITRUS_TEST_PORT_A` and `CITRUS_TEST_PORT_B`. |
 
@@ -199,8 +202,8 @@ flowchart LR
 
 | Layer | Responsibility |
 | :-- | :-- |
-| **UI** | Slint components and Material-style widgets. All property updates happen on the UI thread. |
-| **App layer** | Registers callbacks, builds `SendRequest`s, merges receive events, decodes text, maintains byte counts, and flushes the log at about 30 Hz. |
+| **UI** | Slint components and Material-style widgets. `ui/i18n.slint` holds bilingual strings, `MaterialTheme.theme-id` selects a palette, and all property updates happen on the UI thread. |
+| **App layer** | Registers callbacks, builds `SendRequest`s, merges receive events, decodes text, maintains byte counts, flushes the log at about 30 Hz, and persists language/theme settings. |
 | **Serial worker** | Sole owner of `SerialPort`. Handles open/close/send, batching, CTS polling, and read/write failure handling. |
 | **Channels** | `crossbeam-channel` carries `Command` to the worker and `Event` back to the app. |
 | **Tests** | Unix PTY and Windows COM targets share transfer, reconnect, encoding, and performance scenarios. |
@@ -244,6 +247,7 @@ The application log stays responsive with a 5 MiB cap: a 1 KiB append costs abou
 - [x] CTS display plus RTS/Break control-line operations.
 - [x] PTY regression fixture, COM fixture, shared scenarios, and English reports.
 - [x] Linux/Windows build, test, and packaging scripts plus CI release flow.
+- [x] Settings page with live Chinese/English switching, three Material 3 themes, and persisted preferences.
 - [ ] Verify Windows native builds, PowerShell scripts, and COM pairs on real hardware.
 - [ ] Validate CTS/RTS/Break, hardware flow control, and USB removal with devices.
 - [ ] Add a paired virtual UART driver for RTS/CTS pause/resume acceptance.

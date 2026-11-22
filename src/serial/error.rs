@@ -45,6 +45,27 @@ impl fmt::Display for SerialError {
     }
 }
 
+impl SerialError {
+    /// 按 UI 语言返回可读文本；未知语言回退到中文。
+    pub fn localized(&self, lang: &str) -> String {
+        if lang != "en" {
+            return self.to_string();
+        }
+        match self {
+            SerialError::EmptyPort => "No serial port selected".to_string(),
+            SerialError::InvalidBaudRate(v) => format!("Invalid baud rate: {v}"),
+            SerialError::InvalidDataBits(v) => format!("Invalid data bits: {v}"),
+            SerialError::InvalidParity(v) => format!("Invalid parity: {v}"),
+            SerialError::InvalidStopBits(v) => format!("Invalid stop bits: {v}"),
+            SerialError::InvalidFlowControl(v) => format!("Invalid flow control: {v}"),
+            SerialError::InvalidHex(v) => format!("Invalid HEX: {v}"),
+            SerialError::Encoding(v) => format!("Encoding error: {v}"),
+            SerialError::PortEnumeration(e) => format!("Port enumeration failed: {e}"),
+            SerialError::Port(e) => format!("Serial port error: {e}"),
+        }
+    }
+}
+
 impl std::error::Error for SerialError {}
 
 impl From<serialport::Error> for SerialError {
