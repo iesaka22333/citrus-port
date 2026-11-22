@@ -15,6 +15,10 @@ pub enum Command {
     Close,
     /// 发送原始字节
     Send(Vec<u8>),
+    /// 设置 RTS 电平（true = 有效）
+    SetRts(bool),
+    /// 设置 Break 状态（true = 发送 Break）
+    SetBreak(bool),
     /// 终止 worker 线程
     Shutdown,
 }
@@ -36,6 +40,8 @@ pub enum Event {
     PortsChanged(Vec<PortInfo>),
     /// 端口枚举失败（区别于"真的没有端口"）
     PortEnumerationError(String),
+    /// CTS 输入状态发生变化（由 worker 周期读取）
+    CtsState(bool),
 }
 
 /// 端口信息：区分实际端口名与用于 UI 显示的文本。

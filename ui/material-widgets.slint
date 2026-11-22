@@ -163,6 +163,12 @@ export component MaterialNavigationItem {
 }
 
 
+/// 端口选项：`display` 用于列表展示，`name` 是传给后端的实际设备路径。
+export struct PortOption {
+    name: string,
+    display: string,
+}
+
 export component MaterialSelect {
     in property <[string]> options: [];
     in-out property <string> value: "";
@@ -258,6 +264,143 @@ export component MaterialSelect {
 
                             option_touch := TouchArea {
                                 clicked => { root.value = option; popup.close(); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 可编辑的端口字段：既能从自动发现的列表中选，也能直接手填设备路径。
+/// 选择列表项时写入实际路径 `name`，手动输入则原样保留，避免被截断。
+export component MaterialPortField {
+    in property <[PortOption]> options: [];
+    in-out property <string> value: "";
+    in property <string> placeholder: "";
+    in property <bool> enabled: true;
+    callback accepted();
+    height: 48px;
+    min-width: 80px;
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: 8px;
+        border-width: input.has-focus ? 2px : 1px;
+        border-color: !root.enabled
+            ? MaterialTheme.outline_variant
+            : input.has-focus ? MaterialTheme.control_border_focus : MaterialTheme.control_border;
+        background: !root.enabled
+            ? MaterialTheme.surface_container_highest
+            : MaterialTheme.control_background;
+
+        // 端口路径是可编辑输入框：既支持手填，也支持从下拉列表选。
+        input := TextInput {
+            x: 12px;
+            y: 0px;
+            width: max(0px, parent.width - 52px);
+            height: parent.height;
+            text <=> root.value;
+            enabled: root.enabled;
+            color: !root.enabled ? MaterialTheme.text_disabled : MaterialTheme.text_primary;
+            font-size: 14px;
+            vertical-alignment: center;
+            single-line: true;
+            accepted => { root.accepted(); }
+        }
+
+        if root.value == "" && root.placeholder != "" : Text {
+            x: 12px;
+            width: max(0px, parent.width - 52px);
+            height: parent.height;
+            text: root.placeholder;
+            color: MaterialTheme.text_disabled;
+            font-size: 14px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        // 下拉箭头：展开自动发现的端口列表。
+        Rectangle {
+            x: parent.width - 40px;
+            y: 0px;
+            width: 40px;
+            height: parent.height;
+            background: Colors.transparent;
+
+            Text {
+                text: "expand_more";
+                font-family: "Material Symbols Rounded";
+                color: !root.enabled ? MaterialTheme.text_disabled : MaterialTheme.text_secondary;
+                font-size: 24px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            touch := TouchArea {
+                enabled: root.enabled;
+                clicked => { popup.show(); }
+            }
+        }
+    }
+
+    popup := PopupWindow {
+        x: 0px;
+        y: root.height + 4px;
+        width: max(root.width, 160px);
+
+        Rectangle {
+            background: MaterialTheme.surface_container_lowest;
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: MaterialTheme.outline_variant;
+
+            VerticalLayout {
+                padding: 6px;
+                spacing: 0px;
+
+                if root.options.length == 0 : Text {
+                    height: 40px;
+                    text: "未发现可用端口，可直接输入路径";
+                    color: MaterialTheme.text_secondary;
+                    font-size: 13px;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                }
+
+                // 选项列表：超过最大高度时内部滚动，防止撑大 popup。
+                list_flick := Flickable {
+                    height: min(options_col.preferred-height, 300px);
+                    viewport-height: options_col.preferred-height;
+
+                    options_col := VerticalLayout {
+                        width: 100%;
+                        spacing: 2px;
+
+                        for option in root.options : Rectangle {
+                            height: 40px;
+                            border-radius: 8px;
+                            background: option_touch.has-hover ? MaterialTheme.primary_container : Colors.transparent;
+
+                            Text {
+                                text: option.display;
+                                x: 12px;
+                                width: max(0px, parent.width - 24px);
+                                height: parent.height;
+                                color: option_touch.has-hover ? MaterialTheme.on_primary_container : MaterialTheme.text_primary;
+                                font-size: 14px;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+
+                            option_touch := TouchArea {
+                                clicked => {
+                                    // 列表展示 display，但实际写回的是设备路径 name。
+                                    root.value = option.name;
+                                    popup.close();
+                                }
                             }
                         }
                     }
@@ -438,25 +581,32 @@ export component MaterialReceiveView {
         // 接收数据显示区域
         // ================================================================
 
-        Flickable {
+        flick := Flickable {
             x: 12px;
             y: 12px;
 
             width: parent.width - 24px;
             height: parent.height - 24px;
 
-
-            // 内容高度由 Text 自己决定。
+            // 内容高度由文本控件决定。
             viewport-height: content.preferred-height;
 
             // ============================================================
-            // 接收文本
+            // 接收文本（只读 TextInput）
+            //
+            // 使用 TextInput 而不是 Text，以便支持拖选、Shift+方向键
+            // 与 Ctrl+C 复制；read-only 阻止编辑但保留选择能力。
             // ============================================================
 
-            content := Text {
-                width: parent.width;
+            content := TextInput {
+                width: flick.width;
+                height: max(flick.height, content.preferred-height);
 
                 text: root.text;
+
+                enabled: root.enabled;
+                read-only: true;
+                single-line: false;
 
                 color: root.enabled
                     ? MaterialTheme.text_primary
@@ -466,9 +616,30 @@ export component MaterialReceiveView {
 
                 // 长行自动换行，避免横向滚动。
                 wrap: word-wrap;
-
                 vertical-alignment: top;
             }
+        }
+
+        // 自动滚屏：只在文本变化或重新打开自动滚屏时跳到底部，
+        // 不做持续绑定，避免用户拖选时被强制拉扯。
+        scroll_timer := Timer {
+            interval: 16ms;
+            running: false;
+            triggered => {
+                flick.viewport-y = max(0px, flick.viewport-height - flick.height);
+            }
+        }
+    }
+
+    changed text => {
+        if (root.auto_scroll) {
+            scroll_timer.restart();
+        }
+    }
+
+    changed auto_scroll => {
+        if (root.auto_scroll) {
+            scroll_timer.restart();
         }
     }
 }

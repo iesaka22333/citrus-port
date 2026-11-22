@@ -29,7 +29,7 @@ pub fn parse_hex(text: &str) -> Result<Vec<u8>, SerialError> {
     if cleaned.is_empty() {
         return Ok(Vec::new());
     }
-    if cleaned.len() % 2 != 0 {
+    if !cleaned.len().is_multiple_of(2) {
         return Err(SerialError::InvalidHex(
             "十六进制数据长度必须为偶数".to_string(),
         ));

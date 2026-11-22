@@ -21,6 +21,7 @@ pub enum Encoding {
 impl Encoding {
     /// 根据 UI 传入的编码字符串（`UTF-8` / `GBK` / `ASCII`）解析，
     /// 未知值回退为 UTF-8。仅作为兼容入口，内部始终使用枚举。
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {
             "GBK" => Encoding::Gbk,

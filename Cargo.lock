@@ -778,6 +778,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "citrus-port"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "crossbeam-channel",
+ "encoding_rs",
+ "serialport",
+ "slint",
+ "slint-build",
+]
+
+[[package]]
 name = "clang-sys"
 version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4520,18 +4532,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "spin_on",
-]
-
-[[package]]
-name = "slint-rust-template"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "crossbeam-channel",
- "encoding_rs",
- "serialport",
- "slint",
- "slint-build",
 ]
 
 [[package]]

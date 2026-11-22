@@ -35,7 +35,9 @@ pub struct SerialManager {
 /// 串口 read 缓冲区大小。
 const READ_BUF_SIZE: usize = 4096;
 /// 串口 read 超时（ms）：worker 借此周期性醒来检查命令与 flush。
-const READ_TIMEOUT_MS: u64 = 10;
+/// 取较小值可降低“提交发送 → write_all”的命令响应延迟；
+/// 2 ms 对应空闲时约 500 次/秒的唤醒，桌面场景开销可接受。
+const READ_TIMEOUT_MS: u64 = 2;
 /// 接收批处理触发阈值（字节）：达到即 flush 一次。
 const FLUSH_BYTES: usize = 8192;
 /// 接收批处理触发阈值（时间）：首个字节停留超过此时长即 flush。
@@ -44,6 +46,8 @@ const FLUSH_INTERVAL_MS: u64 = 16;
 const CHUNKS_PER_TICK: usize = 8;
 /// 端口枚举轮询周期。
 const POLL_PERIOD: Duration = Duration::from_secs(3);
+/// CTS 输入状态轮询周期。
+const CTS_POLL_PERIOD: Duration = Duration::from_millis(250);
 
 impl SerialManager {
     /// 启动串口 worker 线程与端口轮询线程，返回管理器与事件接收端。
@@ -97,6 +101,16 @@ impl SerialManager {
         let _ = self.command_tx.send(Command::Send(data));
     }
 
+    /// 设置 RTS 电平（非阻塞）。
+    pub fn set_rts(&self, level: bool) {
+        let _ = self.command_tx.send(Command::SetRts(level));
+    }
+
+    /// 设置 Break 状态（非阻塞）。
+    pub fn set_break(&self, enabled: bool) {
+        let _ = self.command_tx.send(Command::SetBreak(enabled));
+    }
+
     /// 将 UI 的端口显示文本解析为实际端口名，优先从已知端口缓存映射，
     /// 避免连接时重复枚举整个系统。
     pub fn resolve_port_name(&self, current_port: &str) -> String {
@@ -146,18 +160,18 @@ pub fn list_ports() -> Result<Vec<PortInfo>, SerialError> {
 }
 
 /// 从已知端口列表中解析实际端口名，作为避免重复枚举的快速路径。
+///
+/// - 命中缓存：`name` 或 `display` 与输入完全一致时返回实际 `name`。
+/// - 未命中：把用户手填的路径原样返回（仅去除首尾空白），
+///   绝不按空白切分，避免 `/dev/serial/by-id/...` 或带空格路径被截断。
 fn resolve_port_name_from(current_port: &str, known: &[PortInfo]) -> String {
+    let current = current_port.trim();
     for p in known {
-        if p.name == current_port || p.display == current_port {
+        if p.name == current || p.display == current {
             return p.name.clone();
         }
     }
-    // 兜底：取第一个空白分隔的 token 作为端口名（仅在缓存未命中时使用）。
-    current_port
-        .split_whitespace()
-        .next()
-        .unwrap_or(current_port)
-        .to_string()
+    current.to_string()
 }
 
 /// 串口 worker 主循环：串行处理命令 + 读取串口数据 + 接收批处理。
@@ -169,6 +183,9 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
     let mut port: Option<Box<dyn serialport::SerialPort>> = None;
     let mut pending: Vec<u8> = Vec::with_capacity(FLUSH_BYTES);
     let mut pending_since: Option<Instant> = None;
+    // CTS 是输入信号，需要周期读取；只在状态变化时上报，避免事件刷屏。
+    let mut last_cts: Option<bool> = None;
+    let mut last_cts_poll: Option<Instant> = None;
 
     loop {
         // 1. 非阻塞地循环处理排队命令，优先响应 Shutdown。
@@ -186,6 +203,8 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
                     if port.take().is_some() {
                         let _ = event_tx.send(Event::Disconnected);
                     }
+                    last_cts = None;
+                    last_cts_poll = None;
                     match open_port(&cfg) {
                         Ok(p) => {
                             port = Some(p);
@@ -203,6 +222,8 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
                     if port.take().is_some() {
                         let _ = event_tx.send(Event::Disconnected);
                     }
+                    last_cts = None;
+                    last_cts_poll = None;
                 }
                 Command::Send(data) => match port.as_mut() {
                     Some(p) => {
@@ -215,6 +236,8 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
                                 // 写失败：先 flush 残余 RX，再报错并断开。
                                 flush_pending(&mut pending, &mut pending_since, &event_tx);
                                 port = None;
+                                last_cts = None;
+                                last_cts_poll = None;
                                 let _ = event_tx.send(Event::Error(format!("发送失败: {e}")));
                                 let _ = event_tx.send(Event::Disconnected);
                             }
@@ -224,6 +247,25 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
                         let _ = event_tx.send(Event::Error("未连接串口，无法发送".to_string()));
                     }
                 },
+                Command::SetRts(level) => {
+                    if let Some(p) = port.as_mut()
+                        && let Err(e) = p.write_request_to_send(level)
+                    {
+                        let _ = event_tx.send(Event::Error(format!("设置 RTS 失败: {e}")));
+                    }
+                }
+                Command::SetBreak(enabled) => {
+                    if let Some(p) = port.as_mut() {
+                        let result = if enabled {
+                            p.set_break()
+                        } else {
+                            p.clear_break()
+                        };
+                        if let Err(e) = result {
+                            let _ = event_tx.send(Event::Error(format!("设置 Break 失败: {e}")));
+                        }
+                    }
+                }
             }
         }
         if shutdown {
@@ -231,12 +273,11 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
         }
 
         // 2. 到达时间阈值的 pending 数据先 flush。
-        if !pending.is_empty() {
-            if let Some(t) = pending_since {
-                if t.elapsed() >= Duration::from_millis(FLUSH_INTERVAL_MS) {
-                    flush_pending(&mut pending, &mut pending_since, &event_tx);
-                }
-            }
+        if !pending.is_empty()
+            && let Some(t) = pending_since
+            && t.elapsed() >= Duration::from_millis(FLUSH_INTERVAL_MS)
+        {
+            flush_pending(&mut pending, &mut pending_since, &event_tx);
         }
 
         // 3. 若串口已打开，drain 读取数据（聚合到 pending，按批 flush）。
@@ -259,6 +300,8 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
                         // 读取失败（如设备拔出）：先 flush 残余 RX，再报错并断开。
                         flush_pending(&mut pending, &mut pending_since, &event_tx);
                         port = None;
+                        last_cts = None;
+                        last_cts_poll = None;
                         let _ = event_tx.send(Event::Error(format!("读取失败: {e}")));
                         let _ = event_tx.send(Event::Disconnected);
                         break;
@@ -268,6 +311,19 @@ fn worker_loop(command_rx: Receiver<Command>, event_tx: Sender<Event>) {
         } else {
             // 无端口时轻微让出 CPU，等待命令到来。
             thread::sleep(Duration::from_millis(1));
+        }
+
+        // 4. 周期读取 CTS：只在电平变化时上报，读失败（如 PTY 不支持）静默忽略。
+        if let Some(p) = port.as_mut()
+            && last_cts_poll.is_none_or(|t| t.elapsed() >= CTS_POLL_PERIOD)
+        {
+            last_cts_poll = Some(Instant::now());
+            if let Ok(level) = p.read_clear_to_send()
+                && last_cts != Some(level)
+            {
+                last_cts = Some(level);
+                let _ = event_tx.send(Event::CtsState(level));
+            }
         }
     }
 
@@ -331,5 +387,57 @@ fn poll_loop(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_port_name_from;
+    use crate::serial::event::PortInfo;
+
+    fn known_ports() -> Vec<PortInfo> {
+        vec![
+            PortInfo {
+                name: "/dev/ttyUSB0".into(),
+                display: "/dev/ttyUSB0 — CH340".into(),
+            },
+            PortInfo {
+                name: "COM3".into(),
+                display: "COM3".into(),
+            },
+        ]
+    }
+
+    #[test]
+    fn resolves_exact_port_name() {
+        assert_eq!(
+            resolve_port_name_from("/dev/ttyUSB0", &known_ports()),
+            "/dev/ttyUSB0"
+        );
+    }
+
+    #[test]
+    fn resolves_display_name_to_actual_name() {
+        assert_eq!(
+            resolve_port_name_from("/dev/ttyUSB0 — CH340", &known_ports()),
+            "/dev/ttyUSB0"
+        );
+    }
+
+    #[test]
+    fn manual_path_is_passed_through_without_splitting() {
+        // 未命中缓存时必须原样保留，不能退化成第一个空白分隔 token。
+        assert_eq!(
+            resolve_port_name_from("/dev/serial/by-id/usb-FTDI_FT232R 0", &known_ports()),
+            "/dev/serial/by-id/usb-FTDI_FT232R 0"
+        );
+    }
+
+    #[test]
+    fn trims_surrounding_whitespace_for_manual_path() {
+        assert_eq!(
+            resolve_port_name_from("  /dev/pts/7  ", &known_ports()),
+            "/dev/pts/7"
+        );
     }
 }

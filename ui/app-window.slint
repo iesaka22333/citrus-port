@@ -9,6 +9,8 @@ import {
     MaterialOutlinedButton,
     MaterialNavigationItem,
     MaterialSelect,
+    MaterialPortField,
+    PortOption,
     SectionTitle,
     FieldLabel,
     MaterialCheckbox,
@@ -37,7 +39,7 @@ export component MainWindow inherits Window {
     in-out property <bool> is_connected: false;
     in-out property <bool> is_connecting: false;
 
-    in property <[string]> available_ports: [];
+    in property <[PortOption]> available_ports: [];
     in-out property <string> current_port: "";
     in-out property <string> current_baud_rate: "115200";
     in-out property <string> current_encoding: "UTF-8";
@@ -48,6 +50,8 @@ export component MainWindow inherits Window {
 
     in-out property <string> rx_content: "CitrusPort等待打开串口...";
     in-out property <string> tx_content: "";
+    in-out property <int> rx_byte_count: 0;
+    in-out property <int> tx_byte_count: 0;
 
     in-out property <bool> cts_enabled: false;
     in-out property <bool> rts_enabled: false;
@@ -69,6 +73,8 @@ export component MainWindow inherits Window {
     callback send_clicked();
     callback clear_rx_clicked();
     callback save_rx_clicked();
+    callback set_rts_clicked(bool);
+    callback set_break_clicked(bool);
 
 
     // ========================================================================
@@ -372,12 +378,14 @@ export component MainWindow inherits Window {
                                     FieldLabel {
                                          text: "端口" ; 
                                    } 
-                                    MaterialSelect { 
-                                        width: 100%; 
-                                        horizontal-stretch: 1; 
-                                        options: root.available_ports; 
-                                        value <=> root.current_port; 
-                                        placeholder: "选择端口"; 
+                                    MaterialPortField {
+                                        width: 100%;
+                                        horizontal-stretch: 1;
+                                        options: root.available_ports;
+                                        value <=> root.current_port;
+                                        placeholder: "选择或输入端口路径";
+                                        enabled: !root.is_connected && !root.is_connecting;
+                                        accepted => { root.toggle_port_clicked(); }
                                     }
 
 
@@ -547,21 +555,31 @@ export component MainWindow inherits Window {
                                         spacing: 8px;
 
 
+                                        // CTS 是输入信号，由后端周期读取，仅作状态显示。
                                         MaterialCheckbox {
                                             text: "CTS";
                                             checked <=> root.cts_enabled;
+                                            enabled: false;
                                         }
 
 
                                         MaterialCheckbox {
                                             text: "RTS";
                                             checked <=> root.rts_enabled;
+                                            enabled: root.is_connected;
+                                            toggled => {
+                                                root.set_rts_clicked(root.rts_enabled);
+                                            }
                                         }
 
 
                                         MaterialCheckbox {
                                             text: "Break";
                                             checked <=> root.break_enabled;
+                                            enabled: root.is_connected;
+                                            toggled => {
+                                                root.set_break_clicked(root.break_enabled);
+                                            }
                                         }
                                     }
                                 }
@@ -698,9 +716,7 @@ export component MainWindow inherits Window {
 
 
                             Text {
-                                text: root.rx_content == ""
-                                    ? "0 bytes"
-                                    : "接收中";
+                                text: "RX " + root.rx_byte_count + " B / TX " + root.tx_byte_count + " B";
 
                                 color: MaterialTheme.text_secondary;
                                 font-size: 12px;

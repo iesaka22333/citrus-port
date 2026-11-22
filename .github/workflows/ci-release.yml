@@ -1,0 +1,138 @@
+name: CitrusPort CI & Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE*'
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE*'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    name: Build & Test (${{ matrix.os_name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os_name: linux
+            runner: ubuntu-latest
+          - os_name: windows
+            runner: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry and build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux system dependencies (libudev & Slint backends)
+        if: matrix.os_name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libudev-dev \
+            libxkbcommon-dev \
+            libwayland-dev \
+            libx11-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libfontconfig1-dev \
+            libfreetype-dev
+
+      - name: Build & Run Tests (Linux)
+        if: matrix.os_name == 'linux'
+        run: |
+          chmod +x ./scripts/build.sh ./scripts/deploy.sh
+          ./scripts/build.sh --platform linux --profile both --test --report test-results-linux.txt
+
+      - name: Build & Run Tests (Windows)
+        if: matrix.os_name == 'windows'
+        shell: pwsh
+        run: |
+          .\scripts\build.ps1 --platform windows --profile both --test --report test-results-windows.txt
+
+      - name: Upload test report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ matrix.os_name }}
+          path: test-results-${{ matrix.os_name }}.txt
+          retention-days: 7
+
+      - name: Package Release Artifacts (Linux)
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.os_name == 'linux'
+        run: |
+          ./scripts/deploy.sh --platform linux --profile release --skip-build --out dist-linux
+
+      - name: Package Release Artifacts (Windows)
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.os_name == 'windows'
+        shell: pwsh
+        run: |
+          .\scripts\deploy.ps1 --platform windows --profile release --skip-build --out dist-windows
+
+      - name: Upload release stage artifacts
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os_name }}
+          path: dist-${{ matrix.os_name }}/*
+          retention-days: 1
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-and-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all staged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: release-assets
+          merge-multiple: false
+
+      - name: Merge checksums and flatten release assets
+        run: |
+          set -euo pipefail
+          cd release-assets
+          # Each platform artifact contains its own SHA256SUMS. Keep them in
+          # separate directories so one does not overwrite the other, then
+          # concatenate and flatten the archives for the release action.
+          cat dist-*/SHA256SUMS > SHA256SUMS
+          find dist-* -maxdepth 1 -type f ! -name SHA256SUMS -exec mv {} . \;
+          rm -rf dist-*
+          ls -lh
+
+      - name: Verify release checksums
+        run: |
+          set -euo pipefail
+          cd release-assets
+          sha256sum -c SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release-assets/*
